@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import VisitHistory from './pages/VisitHistory'
@@ -7,11 +7,13 @@ import SocietyControl from './pages/SocietyControl'
 import OverviewCombined from './pages/OverviewCombined'
 
 function Layout({ children }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
   return (
-    <div className="min-h-screen bg-white">
-      <div className="max-w-[1400px] mx-auto flex">
-        <Sidebar />
-        <main className="flex-1 px-8 py-6">
+    <div className="min-h-screen bg-white w-full">
+      <div className="max-w-[1400px] mx-auto flex flex-col lg:flex-row w-full">
+        <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
+        <main className="flex-1 px-4 sm:px-6 lg:px-8 py-4 sm:py-6 min-h-screen w-full">
           {children}
         </main>
       </div>

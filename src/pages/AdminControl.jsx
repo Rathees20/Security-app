@@ -101,10 +101,10 @@ export default function AdminControl() {
   ];
 
   return (
-    <div className="px-10 bg-white min-h-screen">
+    <div className="px-4 sm:px-6 lg:px-10 bg-white min-h-screen">
       {/* Header */}
-      <div className="flex items-center justify-between mb-10">
-        <h1 className="text-2xl font-semibold text-neutral-900">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 sm:mb-10 gap-4">
+        <h1 className="text-xl sm:text-2xl font-semibold text-neutral-900">
           Admin Control
         </h1>
 
@@ -127,7 +127,7 @@ export default function AdminControl() {
             
             {/* Notification Dropdown */}
             {showNotifications && (
-              <div className="absolute right-0 top-12 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+              <div className="absolute right-0 top-12 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-lg shadow-lg border border-gray-200 z-50">
                 <div className="p-4 border-b border-gray-100">
                   <h3 className="font-semibold text-gray-800">Notifications</h3>
                 </div>
@@ -165,7 +165,7 @@ export default function AdminControl() {
       </div>
 
       {/* Search bar */}
-      <div className="relative w-1/3 mb-10">
+      <div className="relative w-full sm:w-1/3 mb-6 sm:mb-10">
         <input
           type="text"
           placeholder="Search admin"
@@ -189,11 +189,11 @@ export default function AdminControl() {
       </div>
 
       {/* All Admins Header + Buttons */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
         <h2 className="text-lg font-semibold text-neutral-900">All Admins</h2>
 
-        <div className="flex items-center gap-4">
-          <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 hover:bg-gray-50 transition">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+          <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 hover:bg-gray-50 transition justify-center">
             <svg
               className="w-4 h-4 text-gray-600"
               fill="currentColor"
@@ -210,7 +210,7 @@ export default function AdminControl() {
 
           <button
             onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-4 py-2 border border-[#b00020] rounded-lg text-sm text-[#b00020] font-medium hover:bg-[#b00020]/10 transition"
+            className="flex items-center gap-2 px-4 py-2 border border-[#b00020] rounded-lg text-sm text-[#b00020] font-medium hover:bg-[#b00020]/10 transition justify-center"
           >
             <svg
               className="w-3.5 h-3.5 text-[#b00020]"
@@ -229,7 +229,7 @@ export default function AdminControl() {
       </div>
 
       {/* Admin cards */}
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredAdmins.map((admin, index) => (
           <div
             key={index}
@@ -278,8 +278,8 @@ export default function AdminControl() {
 
       {/* Add Admin Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white w-full max-w-md rounded-lg shadow-xl p-6">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-md rounded-lg shadow-xl p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold text-lg text-gray-800">Add Admin</h3>
               <button

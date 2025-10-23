@@ -50,10 +50,10 @@ export default function VisitHistory() {
   ];
 
   return (
-    <div className="space-y-6 p-4 bg-white">
+    <div className="space-y-6 p-4 bg-white min-h-screen">
       {/* Header with Title, Notification, and Profile */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-semibold text-gray-800">Visit History</h1>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+        <h1 className="text-xl sm:text-2xl font-semibold text-gray-800">Visit History</h1>
         <div className="flex items-center gap-4">
           <div className="relative">
             <button 
@@ -77,7 +77,7 @@ export default function VisitHistory() {
             
             {/* Notification Dropdown */}
             {showNotifications && (
-              <div className="absolute right-0 top-12 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+              <div className="absolute right-0 top-12 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-lg shadow-lg border border-gray-200 z-50">
                 <div className="p-4 border-b border-gray-100">
                   <h3 className="font-semibold text-gray-800">Notifications</h3>
                 </div>
@@ -115,7 +115,7 @@ export default function VisitHistory() {
       </div>
 
       {/* Search and Sort Section */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="relative w-full max-w-md">
           <input
             type="text"
@@ -138,7 +138,7 @@ export default function VisitHistory() {
             />
           </svg>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm text-gray-700">
+        <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm text-gray-700 w-full sm:w-auto justify-center">
           <span>Sort By: Date</span>
           <svg
             className="w-4 h-4 text-gray-600"
@@ -157,24 +157,24 @@ export default function VisitHistory() {
       {/* Visit History Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[600px]">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-800">Name</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-800">Building Name</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-800">Approved by</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-800">Remarks</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-800">Date and Time</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-sm font-semibold text-gray-800">Name</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-sm font-semibold text-gray-800">Building Name</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-sm font-semibold text-gray-800">Approved by</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-sm font-semibold text-gray-800">Remarks</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-sm font-semibold text-gray-800">Date and Time</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredVisits.map((visit, index) => (
                 <tr key={index} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 text-sm text-gray-700">{visit.name}</td>
-                  <td className="px-6 py-4 text-sm text-gray-700">{visit.buildingName}</td>
-                  <td className="px-6 py-4 text-sm text-gray-700">{visit.approvedBy}</td>
-                  <td className="px-6 py-4 text-sm text-gray-700">{visit.remarks}</td>
-                  <td className="px-6 py-4 text-sm text-gray-700">{visit.dateTime}</td>
+                  <td className="px-3 sm:px-6 py-4 text-sm text-gray-700">{visit.name}</td>
+                  <td className="px-3 sm:px-6 py-4 text-sm text-gray-700">{visit.buildingName}</td>
+                  <td className="px-3 sm:px-6 py-4 text-sm text-gray-700">{visit.approvedBy}</td>
+                  <td className="px-3 sm:px-6 py-4 text-sm text-gray-700">{visit.remarks}</td>
+                  <td className="px-3 sm:px-6 py-4 text-sm text-gray-700">{visit.dateTime}</td>
                 </tr>
               ))}
             </tbody>

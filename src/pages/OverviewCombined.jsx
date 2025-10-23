@@ -12,9 +12,9 @@ function Header() {
   ];
 
   return (
-    <header className="flex items-center justify-between">
+    <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
       <div>
-        <h1 className="text-2xl font-semibold">Hi, Admin</h1>
+        <h1 className="text-xl sm:text-2xl font-semibold">Hi, Admin</h1>
         <p className="text-neutral-500 text-sm">Here is your entire security Controls</p>
       </div>
       <div className="flex items-center gap-4">
@@ -31,7 +31,7 @@ function Header() {
           
           {/* Notification Dropdown */}
           {showNotifications && (
-            <div className="absolute right-0 top-12 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+            <div className="absolute right-0 top-12 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-lg shadow-lg border border-gray-200 z-50">
               <div className="p-4 border-b border-gray-100">
                 <h3 className="font-semibold text-gray-800">Notifications</h3>
               </div>
@@ -73,7 +73,7 @@ function RightPanel() {
   )
 
   return (
-    <aside className="w-[350px] shrink-0 space-y-6">
+    <aside className="w-full lg:w-[350px] shrink-0 space-y-6">
       <div className="bg-white rounded-xl shadow-sm border border-neutral-100 p-4">
         <div className="flex items-center justify-between mb-4">
           <button className="text-neutral-800 hover:text-neutral-600">
@@ -90,7 +90,7 @@ function RightPanel() {
         </div>
         <div className="grid grid-cols-7 gap-2 text-center text-sm text-neutral-600 mb-2">
           {['S','M','T','W','T','F','S'].map((day, index) => (
-            <div key={day} className={`py-1 ${index === 3 ? 'bg-[#B00020] text-white rounded' : ''}`}>
+            <div key={`day-${index}`} className={`py-1 ${index === 3 ? 'bg-[#B00020] text-white rounded' : ''}`}>
               {day}
             </div>
           ))}
@@ -255,7 +255,7 @@ function BuildingCard({ idx, name, percent }) {
 function Dashboard() {
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <StatCard />
         <VisitsChart />
       </div>
@@ -275,7 +275,7 @@ function Dashboard() {
             </button>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           <AdminCard name="Sam" building="Building 1" guards={5} employees={20} />
           <AdminCard name="Abraham" building="Building 2" guards={5} employees={20} />
         </div>
@@ -296,7 +296,7 @@ function Dashboard() {
             </button>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           <BuildingCard idx={1} name="Building 1 Name" percent={75} />
           <BuildingCard idx={2} name="Building 2 Name" percent={85} />
         </div>
@@ -306,15 +306,19 @@ function Dashboard() {
 }
 
 export default function OverviewCombined() {
+  const [sidebarOpen, setSidebarOpen] = React.useState(false)
+
   return (
-    <div className="min-h-screen bg-white">
-      <div className="max-w-[1400px] mx-auto flex">
-        <Sidebar />
-        <main className="flex-1 px-8 py-6">
+    <div className="min-h-screen bg-white w-full">
+      <div className="max-w-[1400px] mx-auto flex flex-col lg:flex-row w-full">
+        <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
+        <main className="flex-1 px-4 sm:px-6 lg:px-8 py-4 sm:py-6 min-h-screen w-full">
           <Header />
           <Dashboard />
         </main>
-        <RightPanel />
+        <div className="lg:block w-full lg:w-auto">
+          <RightPanel />
+        </div>
       </div>
     </div>
   )

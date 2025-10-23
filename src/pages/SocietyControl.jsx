@@ -96,11 +96,11 @@ export default function SocietyControl() {
   ];
 
   return (
-    <div className="space-y-8 p-6 bg-white min-h-screen">
+    <div className="space-y-6 sm:space-y-8 p-4 sm:p-6 bg-white min-h-screen">
       {/* Top Header Section */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center">
-          <h1 className="text-3xl font-bold text-neutral-900">Society Control</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900">Society Control</h1>
         </div>
         
         {/* User/Notification Icons - Far Right */}
@@ -117,7 +117,7 @@ export default function SocietyControl() {
             
             {/* Notification Dropdown */}
             {showNotifications && (
-              <div className="absolute right-0 top-12 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+              <div className="absolute right-0 top-12 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-lg shadow-lg border border-gray-200 z-50">
                 <div className="p-4 border-b border-gray-100">
                   <h3 className="font-semibold text-gray-800">Notifications</h3>
                 </div>
@@ -149,7 +149,7 @@ export default function SocietyControl() {
       </div>
 
       {/* Search and Action Bar */}
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
         {/* Search Bar */}
         <div className="relative flex-1 max-w-md">
           <input
@@ -165,7 +165,7 @@ export default function SocietyControl() {
         </div>
         
         {/* Sort Button */}
-        <button className="flex items-center gap-2 px-4 py-3 border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors">
+        <button className="flex items-center gap-2 px-4 py-3 border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors justify-center">
           <svg className="w-4 h-4 text-[#B00020]" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M3 3a1 1 0 000 2v11a1 1 0 102 0V5h10a1 1 0 100-2H3zm11 8a1 1 0 01-1 1H6a1 1 0 110-2h7a1 1 0 011 1zm-1 4a1 1 0 100-2H6a1 1 0 100 2h7z" clipRule="evenodd" />
           </svg>
@@ -174,7 +174,7 @@ export default function SocietyControl() {
         
         {/* Add New Building Button */}
         <button
-          className="flex items-center gap-2 px-4 py-3 bg-[#B00020] text-white rounded-lg hover:bg-red-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-3 bg-[#B00020] text-white rounded-lg hover:bg-red-700 transition-colors justify-center"
           onClick={() => setIsModalOpen(true)}
         >
           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -186,10 +186,10 @@ export default function SocietyControl() {
 
       {/* All Buildings Section */}
       <div>
-        <h2 className="text-2xl font-bold text-neutral-900 mb-6">All Buildings</h2>
+        <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 mb-6">All Buildings</h2>
         
         {/* Building Cards Grid */}
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredBuildings.map((building, index) => (
             <div key={index} className="bg-white rounded-xl shadow-sm border border-neutral-200 p-5 hover:shadow-md transition-shadow">
               {/* Building Image Placeholder */}
@@ -231,8 +231,8 @@ export default function SocietyControl() {
 
       {/* Add Building Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-4 w-full max-w-xs relative">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-4 w-full max-w-xs relative max-h-[90vh] overflow-y-auto">
             <button
               className="absolute top-4 right-4 text-neutral-500 hover:text-neutral-800"
               onClick={() => setIsModalOpen(false)}
