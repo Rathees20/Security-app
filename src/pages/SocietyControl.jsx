@@ -96,7 +96,7 @@ export default function SocietyControl() {
   ];
 
   return (
-    <div className="space-y-6 sm:space-y-8 p-4 sm:p-6 bg-white min-h-screen">
+    <div className="space-y-6 sm:space-y-8 p-4 sm:p-6 bg-white min-h-screen pt-16 lg:pt-4">
       {/* Top Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center">

@@ -50,7 +50,7 @@ export default function VisitHistory() {
   ];
 
   return (
-    <div className="space-y-6 p-4 bg-white min-h-screen">
+    <div className="space-y-6 p-4 bg-white min-h-screen pt-16 lg:pt-4">
       {/* Header with Title, Notification, and Profile */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <h1 className="text-xl sm:text-2xl font-semibold text-gray-800">Visit History</h1>

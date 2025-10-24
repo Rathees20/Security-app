@@ -101,7 +101,7 @@ export default function AdminControl() {
   ];
 
   return (
-    <div className="px-4 sm:px-6 lg:px-10 bg-white min-h-screen">
+    <div className="px-4 sm:px-6 lg:px-10 bg-white min-h-screen pt-16 lg:pt-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 sm:mb-10 gap-4">
         <h1 className="text-xl sm:text-2xl font-semibold text-neutral-900">

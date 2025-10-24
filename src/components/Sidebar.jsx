@@ -6,7 +6,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
       {/* Mobile hamburger button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="lg:hidden fixed top-6 left-4 z-50 p-3 rounded-lg bg-white shadow-lg border border-neutral-200 hover:bg-gray-50 transition-colors"
+        className="lg:hidden fixed top-4 left-4 z-[60] p-3 rounded-lg bg-white shadow-lg border border-neutral-200 hover:bg-gray-50 transition-colors"
       >
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -16,13 +16,13 @@ export default function Sidebar({ isOpen, setIsOpen }) {
       {/* Mobile overlay */}
       {isOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-[45]"
           onClick={() => setIsOpen(false)}
         />
       )}
 
       {/* Sidebar */}
-      <aside className={`w-64 shrink-0 bg-white h-screen fixed lg:sticky top-0 left-0 border-r border-neutral-200 transform transition-transform duration-300 ease-in-out z-40 ${
+      <aside className={`w-64 shrink-0 bg-white h-screen fixed lg:sticky top-0 left-0 border-r border-neutral-200 transform transition-transform duration-300 ease-in-out z-[50] ${
         isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       }`}>
       {/* Logo Section */}
@@ -42,6 +42,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         <div className="flex justify-center">
           <NavLink
             to="/"
+            onClick={() => setIsOpen(false)}
             className={({ isActive }) => `flex items-center gap-3 px-4 py-3 w-48 rounded-lg transition-colors ${isActive ? 'bg-[#b00020] text-white' : 'text-neutral-700 hover:bg-neutral-100'}`}
           >
             <img src="/assets/squares.png" alt="Overview" className="w-5 h-5 object-contain flex-shrink-0" />
@@ -53,6 +54,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         <div className="flex justify-center">
           <NavLink
             to="/history"
+            onClick={() => setIsOpen(false)}
             className={({ isActive }) => `flex items-center gap-3 px-4 py-3 w-48 rounded-lg transition-colors ${isActive ? 'bg-[#b00020] text-white' : 'text-neutral-700 hover:bg-neutral-100'}`}
           >
             <img src="/assets/book.png" alt="Visit History" className="w-5 h-5 object-contain flex-shrink-0" />
@@ -64,6 +66,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         <div className="flex justify-center">
           <NavLink
             to="/admins"
+            onClick={() => setIsOpen(false)}
             className={({ isActive }) => `flex items-center gap-3 px-4 py-3 w-48 rounded-lg transition-colors ${isActive ? 'bg-[#b00020] text-white' : 'text-neutral-700 hover:bg-neutral-100'}`}
           >
             <img src="/assets/user.png" alt="Admin Control" className="w-5 h-5 object-contain flex-shrink-0" />
@@ -75,6 +78,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         <div className="flex justify-center">
           <NavLink
             to="/society"
+            onClick={() => setIsOpen(false)}
             className={({ isActive }) => `flex items-center gap-3 px-4 py-3 w-48 rounded-lg transition-colors ${isActive ? 'bg-[#b00020] text-white' : 'text-neutral-700 hover:bg-neutral-100'}`}
           >
             <img src="/assets/chat.png" alt="Society Control" className="w-5 h-5 object-contain flex-shrink-0" />
