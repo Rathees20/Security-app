@@ -6,8 +6,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
       {/* Mobile hamburger button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="lg:hidden fixed top-2 left-2 z-50 p-2 rounded-md bg-white shadow-md border border-neutral-200"
-        style={{ position: 'fixed' }}
+        className="lg:hidden fixed top-6 left-4 z-50 p-3 rounded-lg bg-white shadow-lg border border-neutral-200 hover:bg-gray-50 transition-colors"
       >
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -23,7 +22,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
       )}
 
       {/* Sidebar */}
-      <aside className={`w-64 shrink-0 bg-white h-screen sticky top-0 border-r border-neutral-200 transform transition-transform duration-300 ease-in-out z-50 ${
+      <aside className={`w-64 shrink-0 bg-white h-screen fixed lg:sticky top-0 left-0 border-r border-neutral-200 transform transition-transform duration-300 ease-in-out z-40 ${
         isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       }`}>
       {/* Logo Section */}

@@ -5,6 +5,9 @@ import VisitHistory from './pages/VisitHistory'
 import AdminControl from './pages/AdminControl'
 import SocietyControl from './pages/SocietyControl'
 import OverviewCombined from './pages/OverviewCombined'
+import SignIn from './components/SignIn'
+import ForgotPassword from './components/ForgotPassword'
+import SignInSuccess from './components/SignInSuccess'
 
 function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -26,6 +29,15 @@ export default function App() {
     <Routes>
       <Route path="/" element={
         <OverviewCombined />
+      } />
+      <Route path="/signin" element={
+        <SignIn />
+      } />
+      <Route path="/forgot-password" element={
+        <ForgotPassword />
+      } />
+      <Route path="/signin-success" element={
+        <SignInSuccess />
       } />
       <Route path="/history" element={
         <Layout>

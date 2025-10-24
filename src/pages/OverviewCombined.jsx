@@ -1,5 +1,6 @@
 import React from 'react'
 import Sidebar from '../components/Sidebar'
+import Profile from '../components/Profile'
 import { LineChart, Line, CartesianGrid, XAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
 function Header() {
@@ -58,13 +59,16 @@ function Header() {
             </div>
           )}
         </div>
-        <img alt="avatar" className="w-10 h-10 rounded-full object-cover" src="https://i.pravatar.cc/80" />
+        <Profile />
       </div>
     </header>
   )
 }
 
 function RightPanel() {
+  const [currentDate, setCurrentDate] = React.useState(new Date())
+  const [selectedDate, setSelectedDate] = React.useState(new Date())
+  
   const Item = ({ idx, title, phone }) => (
     <div className="flex items-center gap-3 py-2">
       <div className="w-6 h-6 bg-[#B00020] text-white text-xs rounded flex items-center justify-center font-medium">{idx}</div>
@@ -72,17 +76,71 @@ function RightPanel() {
     </div>
   )
 
+  const navigateMonth = (direction) => {
+    setCurrentDate(prevDate => {
+      const newDate = new Date(prevDate)
+      if (direction === 'prev') {
+        newDate.setMonth(newDate.getMonth() - 1)
+      } else {
+        newDate.setMonth(newDate.getMonth() + 1)
+      }
+      return newDate
+    })
+  }
+
+  const formatMonthYear = (date) => {
+    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  }
+
+  const handleDateClick = (day) => {
+    setSelectedDate(day.fullDate)
+  }
+
+  const getCalendarDays = (date) => {
+    const year = date.getFullYear()
+    const month = date.getMonth()
+    const firstDay = new Date(year, month, 1)
+    const startDate = new Date(firstDay)
+    startDate.setDate(startDate.getDate() - firstDay.getDay())
+    
+    const days = []
+    const current = new Date(startDate)
+    
+    // Generate 35 days (5 weeks)
+    for (let i = 0; i < 35; i++) {
+      const dayDate = new Date(current)
+      days.push({
+        date: dayDate.getDate(),
+        isCurrentMonth: dayDate.getMonth() === month,
+        isToday: dayDate.toDateString() === new Date().toDateString(),
+        isSelected: dayDate.toDateString() === selectedDate.toDateString(),
+        fullDate: dayDate
+      })
+      current.setDate(current.getDate() + 1)
+    }
+    
+    return days
+  }
+
+  const calendarDays = getCalendarDays(currentDate)
+
   return (
     <aside className="w-full lg:w-[350px] shrink-0 space-y-6">
       <div className="bg-white rounded-xl shadow-sm border border-neutral-100 p-4">
         <div className="flex items-center justify-between mb-4">
-          <button className="text-neutral-800 hover:text-neutral-600">
+          <button 
+            onClick={() => navigateMonth('prev')}
+            className="text-neutral-800 hover:text-neutral-600 transition-colors"
+          >
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
             </svg>
           </button>
-          <div className="font-medium text-neutral-800">July 2025</div>
-          <button className="text-neutral-800 hover:text-neutral-600">
+          <div className="font-medium text-neutral-800">{formatMonthYear(currentDate)}</div>
+          <button 
+            onClick={() => navigateMonth('next')}
+            className="text-neutral-800 hover:text-neutral-600 transition-colors"
+          >
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
             </svg>
@@ -90,22 +148,27 @@ function RightPanel() {
         </div>
         <div className="grid grid-cols-7 gap-2 text-center text-sm text-neutral-600 mb-2">
           {['S','M','T','W','T','F','S'].map((day, index) => (
-            <div key={`day-${index}`} className={`py-1 ${index === 3 ? 'bg-[#B00020] text-white rounded' : ''}`}>
+            <div key={`day-${index}`} className="py-1 font-medium">
               {day}
             </div>
           ))}
         </div>
         <div className="grid grid-cols-7 gap-2 text-center text-sm">
-          {[10, 11, 12, 13, 14, 15, 16].map((date) => (
+          {calendarDays.map((day, index) => (
             <div 
-              key={date} 
-              className={`py-2 rounded-full ${
-                date === 14 
-                  ? 'bg-[#B00020] text-white' 
-                  : 'text-neutral-800 hover:bg-neutral-100'
+              key={index} 
+              onClick={() => handleDateClick(day)}
+              className={`py-2 rounded-full cursor-pointer transition-colors ${
+                day.isSelected
+                  ? 'bg-[#B00020] text-white font-semibold' 
+                  : day.isToday 
+                    ? 'bg-[#B00020] bg-opacity-20 text-[#B00020] font-semibold border-2 border-[#B00020]' 
+                    : day.isCurrentMonth 
+                      ? 'text-neutral-800 hover:bg-neutral-100' 
+                      : 'text-neutral-400 hover:bg-neutral-50'
               }`}
             >
-              {date}
+              {day.date}
             </div>
           ))}
         </div>
