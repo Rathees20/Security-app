@@ -51,7 +51,7 @@ export default function Profile({ showName = true, size = 'default' }) {
           />
           
           {/* Dropdown Menu */}
-          <div className={`absolute ${dropdownClasses[size]} z-50 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2`}>
+          <div className={`absolute ${dropdownClasses[size]} z-50 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 sm:right-0 sm:left-auto left-0`}>
             {/* Profile Info */}
             <div className="px-4 py-3 border-b border-gray-100">
               <div className="flex items-center gap-3">

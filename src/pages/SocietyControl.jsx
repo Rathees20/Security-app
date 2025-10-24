@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Profile from '../components/Profile';
 
 export default function SocietyControl() {
   const buildingData = [
@@ -108,16 +109,20 @@ export default function SocietyControl() {
           <div className="relative">
             <button 
               onClick={() => setShowNotifications(!showNotifications)}
-              className="relative w-10 h-10 rounded-full bg-white shadow-sm border border-neutral-200 flex items-center justify-center hover:bg-gray-50 transition-colors"
+              className="w-10 h-10 flex items-center justify-center rounded-full border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
             >
-            <svg className="w-5 h-5 text-neutral-600" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-            </svg>
+              <svg
+                className="w-5 h-5 text-gray-600"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+              </svg>
             </button>
             
             {/* Notification Dropdown */}
             {showNotifications && (
-              <div className="absolute right-0 top-12 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+              <div className="absolute right-0 top-12 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-lg shadow-lg border border-gray-200 z-50 sm:right-0 sm:left-auto left-0">
                 <div className="p-4 border-b border-gray-100">
                   <h3 className="font-semibold text-gray-800">Notifications</h3>
                 </div>
@@ -144,7 +149,7 @@ export default function SocietyControl() {
               </div>
             )}
           </div>
-          <img alt="avatar" className="w-10 h-10 rounded-full object-cover" src="https://i.pravatar.cc/80" />
+          <Profile />
         </div>
       </div>
 

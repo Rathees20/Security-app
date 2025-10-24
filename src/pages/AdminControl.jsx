@@ -1,4 +1,5 @@
 import React from "react";
+import Profile from '../components/Profile';
 
 export default function AdminControl() {
   const [showModal, setShowModal] = React.useState(false);
@@ -127,7 +128,7 @@ export default function AdminControl() {
             
             {/* Notification Dropdown */}
             {showNotifications && (
-              <div className="absolute right-0 top-12 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+              <div className="absolute right-0 top-12 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-lg shadow-lg border border-gray-200 z-50 sm:right-0 sm:left-auto left-0">
                 <div className="p-4 border-b border-gray-100">
                   <h3 className="font-semibold text-gray-800">Notifications</h3>
                 </div>
@@ -155,12 +156,8 @@ export default function AdminControl() {
             )}
           </div>
 
-          {/* Avatar */}
-          <img
-            alt="avatar"
-            className="w-10 h-10 rounded-full object-cover border border-gray-300"
-            src="https://i.pravatar.cc/80"
-          />
+          {/* Profile */}
+          <Profile />
         </div>
       </div>
 
