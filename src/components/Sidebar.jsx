@@ -30,7 +30,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
       <div className="p-4 flex flex-col items-center justify-center w-full">
         <div className="mb-2">
           <img 
-            src="/src/assets/Security icon.jpg" 
+            src="/assets/Security icon.jpg" 
             alt="Security Check" 
             className="w-20 h-20 object-contain"
           />
@@ -45,7 +45,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             to="/"
             className={({ isActive }) => `flex items-center gap-3 px-4 py-3 w-48 rounded-lg transition-colors ${isActive ? 'bg-[#b00020] text-white' : 'text-neutral-700 hover:bg-neutral-100'}`}
           >
-            <img src="/src/assets/squares.png" alt="Overview" className="w-5 h-5 object-contain flex-shrink-0" />
+            <img src="/assets/squares.png" alt="Overview" className="w-5 h-5 object-contain flex-shrink-0" />
             <span className="text-sm font-medium">Overview</span>
           </NavLink>
         </div>
@@ -56,7 +56,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             to="/history"
             className={({ isActive }) => `flex items-center gap-3 px-4 py-3 w-48 rounded-lg transition-colors ${isActive ? 'bg-[#b00020] text-white' : 'text-neutral-700 hover:bg-neutral-100'}`}
           >
-            <img src="/src/assets/book.png" alt="Visit History" className="w-5 h-5 object-contain flex-shrink-0" />
+            <img src="/assets/book.png" alt="Visit History" className="w-5 h-5 object-contain flex-shrink-0" />
             <span className="text-sm font-medium">Visit History</span>
           </NavLink>
         </div>
@@ -67,7 +67,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             to="/admins"
             className={({ isActive }) => `flex items-center gap-3 px-4 py-3 w-48 rounded-lg transition-colors ${isActive ? 'bg-[#b00020] text-white' : 'text-neutral-700 hover:bg-neutral-100'}`}
           >
-            <img src="/src/assets/user.png" alt="Admin Control" className="w-5 h-5 object-contain flex-shrink-0" />
+            <img src="/assets/user.png" alt="Admin Control" className="w-5 h-5 object-contain flex-shrink-0" />
             <span className="text-sm font-medium">Admin Control</span>
           </NavLink>
         </div>
@@ -78,7 +78,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             to="/society"
             className={({ isActive }) => `flex items-center gap-3 px-4 py-3 w-48 rounded-lg transition-colors ${isActive ? 'bg-[#b00020] text-white' : 'text-neutral-700 hover:bg-neutral-100'}`}
           >
-            <img src="/src/assets/chat.png" alt="Society Control" className="w-5 h-5 object-contain flex-shrink-0" />
+            <img src="/assets/chat.png" alt="Society Control" className="w-5 h-5 object-contain flex-shrink-0" />
             <span className="text-sm font-medium">Society Control</span>
           </NavLink>
         </div>
