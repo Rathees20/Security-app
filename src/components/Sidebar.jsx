@@ -6,7 +6,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
       {/* Mobile hamburger button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-md bg-white shadow-md border border-neutral-200"
+        className="lg:hidden fixed top-2 left-2 z-50 p-2 rounded-md bg-white shadow-md border border-neutral-200"
         style={{ position: 'fixed' }}
       >
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
