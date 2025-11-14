@@ -1,45 +1,86 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Profile from '../components/Profile';
+import { api } from '../utils/api';
+import filterIcon from '../assets/filter.png';
+
+const resolvePath = (object, path) =>
+  path.split('.').reduce((acc, key) => (acc == null ? acc : acc[key]), object);
+
+const pickValue = (object, paths) => {
+  for (const path of paths) {
+    const value = resolvePath(object, path);
+    if (value !== undefined && value !== null && value !== '') {
+      return value;
+    }
+  }
+  return undefined;
+};
+
+const extractArray = (payload, visited = new WeakSet()) => {
+  if (!payload || visited.has(payload)) return [];
+  if (Array.isArray(payload)) return payload;
+
+  visited.add(payload);
+
+  const candidates = [
+    payload.data,
+    payload.results,
+    payload.items,
+    payload.buildings,
+    payload?.data?.buildings,
+    payload?.data?.items,
+    payload?.data?.results,
+    payload?.data?.data,
+    payload?.data?.docs,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate;
+    if (candidate && typeof candidate === 'object') {
+      const nested = extractArray(candidate, visited);
+      if (nested.length) return nested;
+    }
+  }
+
+  return [];
+};
+
+const formatDate = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return typeof value === 'string' ? value : '';
+  }
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+};
+
+const toDisplayString = (value, fallback = '') => {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+  if (Array.isArray(value)) {
+    return value.map((item) => toDisplayString(item, '')).filter(Boolean).join(', ') || fallback;
+  }
+  if (typeof value === 'object') {
+    const entries = Object.values(value)
+      .map((item) => toDisplayString(item, ''))
+      .filter(Boolean);
+    return entries.join(', ') || fallback;
+  }
+  return fallback;
+};
 
 export default function SocietyControl() {
-  const buildingData = [
-    {
-      name: "Building 1 Name",
-      location: "Location address",
-      progress: 75,
-      date: "July 14, 2025"
-    },
-    {
-      name: "Building 1 Name",
-      location: "Location address",
-      progress: 75,
-      date: "July 14, 2025"
-    },
-    {
-      name: "Building 1 Name",
-      location: "Location address",
-      progress: 75,
-      date: "July 14, 2025"
-    },
-    {
-      name: "Building 1 Name",
-      location: "Location address",
-      progress: 75,
-      date: "July 14, 2025"
-    },
-    {
-      name: "Building 1 Name",
-      location: "Location address",
-      progress: 75,
-      date: "July 14, 2025"
-    },
-    {
-      name: "Building 1 Name",
-      location: "Location address",
-      progress: 75,
-      date: "July 14, 2025"
-    }
-  ];
+  const [buildings, setBuildings] = useState([]);
+  const [isLoadingBuildings, setIsLoadingBuildings] = useState(false);
+  const [buildingError, setBuildingError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionMessage, setSubmissionMessage] = useState('');
+  const [submissionError, setSubmissionError] = useState('');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [allowLogin, setAllowLogin] = useState(true);
@@ -73,19 +114,85 @@ export default function SocietyControl() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log('Form submitted:', { ...formData, allowLogin });
-    setIsModalOpen(false);
-    setFormData({
-      buildingName: '',
-      buildingAddress: '',
-      securityGuards: '',
-      employees: '',
-      image: null
-    });
-    setAllowLogin(true);
+    setSubmissionMessage('');
+    setSubmissionError('');
+
+    const formPayload = new FormData();
+    formPayload.append('name', formData.buildingName);
+    formPayload.append('address', formData.buildingAddress);
+    formPayload.append('securityGuards', formData.securityGuards);
+    formPayload.append('employees', formData.employees);
+    formPayload.append('allowLogin', String(allowLogin));
+    if (formData.image) {
+      formPayload.append('image', formData.image);
+    }
+
+    const submitBuilding = async () => {
+      setIsSubmitting(true);
+      try {
+        await api.createBuilding(formPayload);
+        setSubmissionMessage('Building added successfully.');
+        setIsModalOpen(false);
+        setFormData({
+          buildingName: '',
+          buildingAddress: '',
+          securityGuards: '',
+          employees: '',
+          image: null
+        });
+        setAllowLogin(true);
+        await fetchBuildings();
+      } catch (err) {
+        console.error('Failed to create building', err);
+        setSubmissionError(err.message || 'Unable to add building');
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
+
+    submitBuilding();
   };
 
-  const filteredBuildings = buildingData.filter(building =>
+  const fetchBuildings = async () => {
+    setIsLoadingBuildings(true);
+    setBuildingError('');
+    try {
+      const response = await api.getBuildings();
+      const normalized = extractArray(response).map((item, index) => ({
+        id: pickValue(item, ['_id', 'id', 'buildingId']) ?? `building-${index}`,
+      name:
+        toDisplayString(pickValue(item, ['name', 'buildingName', 'title']), 'Unnamed Building'),
+      location: toDisplayString(
+        pickValue(item, ['address', 'buildingAddress', 'location']),
+        'No address provided'
+      ),
+        progress:
+          Number(
+            pickValue(item, [
+              'progress',
+              'completion',
+              'visitCompletionPercentage',
+              'visitCompletion',
+            ])
+          ) || 0,
+        date: formatDate(pickValue(item, ['createdAt', 'updatedAt', 'date'])),
+      }));
+      setBuildings(normalized);
+    } catch (err) {
+      console.error('Failed to fetch buildings', err);
+      setBuildingError(err.message || 'Unable to load buildings');
+      setBuildings([]);
+    } finally {
+      setIsLoadingBuildings(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBuildings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const filteredBuildings = buildings.filter(building =>
     building.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     building.location.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -171,9 +278,7 @@ export default function SocietyControl() {
         
         {/* Sort Button */}
         <button className="flex items-center gap-2 px-4 py-3 border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors justify-center">
-          <svg className="w-4 h-4 text-[#B00020]" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M3 3a1 1 0 000 2v11a1 1 0 102 0V5h10a1 1 0 100-2H3zm11 8a1 1 0 01-1 1H6a1 1 0 110-2h7a1 1 0 011 1zm-1 4a1 1 0 100-2H6a1 1 0 100 2h7z" clipRule="evenodd" />
-          </svg>
+          <img src={filterIcon} alt="Filter list" className="w-4 h-4 object-contain" />
           <span className="text-sm text-neutral-800">Sort By: A to Z</span>
         </button>
         
@@ -192,17 +297,43 @@ export default function SocietyControl() {
       {/* All Buildings Section */}
       <div>
         <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 mb-6">All Buildings</h2>
+        {buildingError && (
+          <div className="mb-4 px-4 py-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg">
+            {buildingError}
+          </div>
+        )}
+        {submissionMessage && (
+          <div className="mb-4 px-4 py-3 text-sm text-green-600 bg-green-50 border border-green-100 rounded-lg">
+            {submissionMessage}
+          </div>
+        )}
+        {submissionError && (
+          <div className="mb-4 px-4 py-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg">
+            {submissionError}
+          </div>
+        )}
         
         {/* Building Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredBuildings.map((building, index) => (
-            <div key={index} className="bg-white rounded-xl shadow-sm border border-neutral-200 p-5 hover:shadow-md transition-shadow">
+          {isLoadingBuildings && (
+            <div className="col-span-full text-center text-sm text-neutral-500 py-6">
+              Loading buildings...
+            </div>
+          )}
+          {!isLoadingBuildings && filteredBuildings.length === 0 && (
+            <div className="col-span-full text-center text-sm text-neutral-500 py-6">
+              No buildings found.
+            </div>
+          )}
+          {!isLoadingBuildings &&
+            filteredBuildings.map((building) => (
+              <div key={building.id} className="bg-white rounded-xl shadow-sm border border-neutral-200 p-5 hover:shadow-md transition-shadow">
               {/* Building Image Placeholder */}
               <div className="h-28 bg-neutral-200 rounded-lg flex items-center justify-center text-neutral-500 mb-4">
                 Building image
               </div>
               
-              {/* Building Name */}
+              {/* Name */}
               <h3 className="font-bold text-neutral-900 text-base mb-1">{building.name}</h3>
               
               {/* Location Address */}
@@ -215,10 +346,10 @@ export default function SocietyControl() {
                   <div className="flex-1 h-2 bg-neutral-200 rounded-full mr-3">
                     <div 
                       className="h-2 bg-[#B00020] rounded-full" 
-                      style={{ width: `${building.progress}%` }}
+                      style={{ width: `${Math.max(0, Math.min(100, building.progress || 0))}%` }}
                     />
                   </div>
-                  <span className="text-sm text-[#B00020] font-medium">{building.progress}%</span>
+                  <span className="text-sm text-[#B00020] font-medium">{Math.max(0, Math.min(100, building.progress || 0))}%</span>
                 </div>
               </div>
               
@@ -227,7 +358,7 @@ export default function SocietyControl() {
                 <svg className="w-4 h-4 text-neutral-500" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
                 </svg>
-                <span className="text-sm text-neutral-500">{building.date}</span>
+                <span className="text-sm text-neutral-500">{building.date || 'Date unavailable'}</span>
               </div>
             </div>
           ))}
@@ -270,9 +401,9 @@ export default function SocietyControl() {
               </div>
             </div>
             
-            {/* Building Name */}
+            {/* Name */}
             <div className="mb-3">
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Building Name</label>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">Name</label>
               <input
                 type="text"
                 name="buildingName"
@@ -349,9 +480,10 @@ export default function SocietyControl() {
             <button 
               type="button"
               onClick={handleSubmit}
-              className="w-full py-3 bg-[#B00020] text-white rounded-lg hover:bg-red-700 transition-colors"
+              className="w-full py-3 bg-[#B00020] text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              disabled={isSubmitting}
             >
-              Add Admin
+              {isSubmitting ? 'Adding...' : 'Add Admin'}
             </button>
           </div>
         </div>

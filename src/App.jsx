@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import React, { useMemo, useState } from 'react'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import VisitHistory from './pages/VisitHistory'
 import AdminControl from './pages/AdminControl'
@@ -24,35 +24,56 @@ function Layout({ children }) {
   )
 }
 
+function RequireAuth({ children }) {
+  const hasToken = useMemo(() => {
+    if (typeof window === 'undefined') return false
+    const token = window.localStorage.getItem('authToken')
+    return Boolean(token)
+  }, [])
+
+  if (!hasToken) {
+    return <Navigate to="/signin" replace />
+  }
+
+  return children
+}
+
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={
-        <OverviewCombined />
-      } />
+      <Route path="/" element={<SignIn />} />
       <Route path="/signin" element={
         <SignIn />
       } />
       <Route path="/forgot-password" element={
         <ForgotPassword />
       } />
-      <Route path="/signin-success" element={
-        <SignInSuccess />
+      <Route path="/signin-success" element={<SignInSuccess />} />
+      <Route path="/overview" element={
+        <RequireAuth>
+          <OverviewCombined />
+        </RequireAuth>
       } />
       <Route path="/history" element={
-        <Layout>
-          <VisitHistory />
-        </Layout>
+        <RequireAuth>
+          <Layout>
+            <VisitHistory />
+          </Layout>
+        </RequireAuth>
       } />
       <Route path="/admins" element={
-        <Layout>
-          <AdminControl />
-        </Layout>
+        <RequireAuth>
+          <Layout>
+            <AdminControl />
+          </Layout>
+        </RequireAuth>
       } />
       <Route path="/society" element={
-        <Layout>
-          <SocietyControl />
-        </Layout>
+        <RequireAuth>
+          <Layout>
+            <SocietyControl />
+          </Layout>
+        </RequireAuth>
       } />
     </Routes>
   )

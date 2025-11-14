@@ -1,16 +1,61 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { api } from '../utils/api'
 
 export default function SignIn() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState('')
   const navigate = useNavigate()
 
-  const handleSignIn = (e) => {
+  useEffect(() => {
+    const existingToken = window.localStorage.getItem('authToken')
+    if (existingToken) {
+      navigate('/overview', { replace: true })
+    }
+  }, [navigate])
+
+  const handleSignIn = async (e) => {
     e.preventDefault()
-    // Simulate successful sign-in
-    navigate('/signin-success')
+    setError('')
+    setIsSubmitting(true)
+    try {
+      const rawIdentifier = email.trim()
+      if (!rawIdentifier) {
+        throw new Error('Please enter your email or phone number')
+      }
+
+      let loginIdentifier = rawIdentifier
+      if (rawIdentifier.includes('@')) {
+        loginIdentifier = rawIdentifier.toLowerCase()
+      } else {
+        const digitsOnly = rawIdentifier.replace(/[^\d\+]/g, '')
+        if (digitsOnly.replace(/[^\d]/g, '').length < 10) {
+          throw new Error('Phone number must include at least 10 digits')
+        }
+        loginIdentifier = digitsOnly
+      }
+
+      const response = await api.login({
+        loginIdentifier,
+        password,
+      })
+      const token = response?.data?.token
+      if (token) {
+        window.localStorage.setItem('authToken', token)
+      }
+      if (response?.data?.user) {
+        window.localStorage.setItem('authUser', JSON.stringify(response.data.user))
+      }
+      navigate('/overview', { replace: true })
+    } catch (err) {
+      console.error('Failed to sign in', err)
+      setError(err.message || 'Unable to sign in. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleForgotPassword = () => {
@@ -40,6 +85,11 @@ export default function SignIn() {
           </div>
 
           <form onSubmit={handleSignIn} className="space-y-6">
+            {error && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 text-left">
+                {error}
+              </div>
+            )}
             {/* Email Field */}
             <div>
               <label className="block text-sm font-medium text-black mb-2">Email ID *</label>
@@ -64,6 +114,7 @@ export default function SignIn() {
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#b00020] focus:border-transparent pr-12"
                   placeholder="Enter your password"
                   required
+                autoComplete="current-password"
                 />
                 <button
                   type="button"
@@ -98,9 +149,10 @@ export default function SignIn() {
             {/* Sign In Button */}
             <button
               type="submit"
-              className="w-full bg-[#b00020] text-white py-3 px-4 rounded-lg font-medium hover:bg-[#8b0018] transition-colors"
+              className="w-full bg-[#b00020] text-white py-3 px-4 rounded-lg font-medium hover:bg-[#8b0018] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              disabled={isSubmitting}
             >
-              Sign In
+              {isSubmitting ? 'Signing In...' : 'Sign In'}
             </button>
           </form>
 

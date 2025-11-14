@@ -1,0 +1,12 @@
+2025-10-31 13:30
+- Topics: Connected VisitHistory, SocietyControl, and AdminControl pages to backend services using new API helper.
+- Code: Added src/utils/api.js; updated src/pages/VisitHistory.jsx, src/pages/SocietyControl.jsx, src/pages/AdminControl.jsx.
+- Decisions: Store auth token in localStorage for authenticated calls; normalize API responses to tolerate field variations; surface loading/error states in UI.
+- Next: Hook up sign-in flow to persist authToken and retest endpoints with valid credentials.
+
+2025-11-14 12:14
+- Topics: Replace filter icons across Admin and Society pages.
+- Code: Updated imports and UI buttons in src/pages/AdminControl.jsx and src/pages/SocietyControl.jsx to use src/assets/filter.png; no other files touched.
+- Decisions: Standardize filter icon via shared asset; keep styling consistent with existing buttons.
+- Next: Verify icon appearance in other pages if they add filter controls later.
+

@@ -1,48 +1,194 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Profile from '../components/Profile';
+import { api } from '../utils/api';
+
+const resolvePath = (object, path) =>
+  path.split('.').reduce((acc, key) => (acc == null ? acc : acc[key]), object);
+
+const pickValue = (object, paths) => {
+  for (const path of paths) {
+    const value = resolvePath(object, path);
+    if (value !== undefined && value !== null && value !== '') {
+      return value;
+    }
+  }
+  return undefined;
+};
+
+const toDisplayString = (value, fallback = '') => {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+  if (Array.isArray(value)) {
+    return value.map((item) => toDisplayString(item, '')).filter(Boolean).join(', ') || fallback;
+  }
+  if (typeof value === 'object') {
+    const entries = Object.values(value)
+      .map((item) => toDisplayString(item, ''))
+      .filter(Boolean);
+    return entries.join(', ') || fallback;
+  }
+  return fallback;
+};
+
+const formatDateTime = (value) => {
+  if (!value) return 'Unknown';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return typeof value === 'string' ? value : 'Unknown';
+  }
+  return date.toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+};
+
+const extractArray = (payload, visited = new WeakSet()) => {
+  if (!payload || visited.has(payload)) return [];
+  if (Array.isArray(payload)) return payload;
+
+  visited.add(payload);
+
+  const candidates = [
+    payload.data,
+    payload.results,
+    payload.items,
+    payload.visits,
+    payload.buildings,
+    payload?.data?.visits,
+    payload?.data?.items,
+    payload?.data?.results,
+    payload?.data?.buildings,
+    payload?.data?.data,
+    payload?.data?.docs,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate;
+    if (candidate && typeof candidate === 'object') {
+      const nested = extractArray(candidate, visited);
+      if (nested.length) return nested;
+    }
+  }
+
+  return [];
+};
+
+const normalizeBuildings = (payload) =>
+  extractArray(payload).map((item, index) => {
+    const id =
+      pickValue(item, ['_id', 'id', 'buildingId', 'uuid']) ?? `building-${index}`;
+    return {
+      id,
+      name: pickValue(item, ['name', 'buildingName', 'title']) || 'Unnamed Building',
+      address:
+        pickValue(item, ['address', 'buildingAddress', 'location', 'addressLine']) ||
+        '',
+    };
+  });
+
+const normalizeVisits = (payload) =>
+  extractArray(payload).map((item, index) => ({
+    id: pickValue(item, ['_id', 'id', 'visitId']) ?? `visit-${index}`,
+    name:
+      toDisplayString(
+        pickValue(item, ['visitorName', 'name', 'visitor.fullName', 'visitor.name']),
+        'Unknown Visitor'
+      ),
+    buildingName: toDisplayString(
+      pickValue(item, ['buildingName', 'building.name', 'building']),
+      'Unknown Building'
+    ),
+    approvedBy: toDisplayString(
+      pickValue(item, [
+        'approvedBy',
+        'approvedByName',
+        'securityPersonnel',
+        'security.name',
+        'guardName',
+      ]),
+      'Not available'
+    ),
+    remarks: toDisplayString(
+      pickValue(item, ['remarks', 'purpose', 'reason', 'note']),
+      'No remarks provided'
+    ),
+    dateTime: formatDateTime(
+      pickValue(item, ['dateTime', 'visitTime', 'createdAt', 'updatedAt', 'timestamp'])
+    ),
+  }));
 
 export default function VisitHistory() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showNotifications, setShowNotifications] = useState(false);
-  
-  const visitData = [
-    {
-      name: "Sara",
-      buildingName: "Building 1- Location",
-      approvedBy: "John Doe - Security",
-      remarks: "Househelp - Employee Code: 17637",
-      dateTime: "12th August, 2025 03:10 PM"
-    },
-    {
-      name: "Sara",
-      buildingName: "Building 1- Location",
-      approvedBy: "John Doe - Security",
-      remarks: "Househelp - Employee Code: 17637",
-      dateTime: "12th August, 2025 03:10 PM"
-    },
-    {
-      name: "Sara",
-      buildingName: "Building 1- Location",
-      approvedBy: "John Doe - Security",
-      remarks: "Househelp - Employee Code: 17637",
-      dateTime: "12th August, 2025 03:10 PM"
-    },
-    {
-      name: "Sara",
-      buildingName: "Building 1- Location",
-      approvedBy: "John Doe - Security",
-      remarks: "Househelp - Employee Code: 17637",
-      dateTime: "12th August, 2025 03:10 PM"
-    }
-  ];
+  const [buildings, setBuildings] = useState([]);
+  const [selectedBuildingId, setSelectedBuildingId] = useState('');
+  const [visits, setVisits] = useState([]);
+  const [isLoadingBuildings, setIsLoadingBuildings] = useState(false);
+  const [isLoadingVisits, setIsLoadingVisits] = useState(false);
+  const [error, setError] = useState('');
 
-  const filteredVisits = visitData.filter(visit =>
-    visit.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    visit.buildingName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    visit.approvedBy.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    visit.remarks.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    visit.dateTime.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  useEffect(() => {
+    const fetchBuildings = async () => {
+      setIsLoadingBuildings(true);
+      setError('');
+      try {
+        const response = await api.getBuildings();
+        const normalized = normalizeBuildings(response);
+        setBuildings(normalized);
+        if (!selectedBuildingId && normalized.length > 0) {
+          const firstWithId = normalized.find((building) => building.id);
+          if (firstWithId?.id) {
+            setSelectedBuildingId(firstWithId.id);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch buildings', err);
+        setError(err.message || 'Unable to load buildings');
+      } finally {
+        setIsLoadingBuildings(false);
+      }
+    };
+
+    fetchBuildings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!selectedBuildingId) {
+      return;
+    }
+
+    const fetchVisits = async () => {
+      setIsLoadingVisits(true);
+      setError('');
+      try {
+        const response = await api.getTodayVisits(selectedBuildingId);
+        const normalized = normalizeVisits(response);
+        setVisits(normalized);
+      } catch (err) {
+        console.error('Failed to fetch visits', err);
+        setError(err.message || 'Unable to load visits');
+        setVisits([]);
+      } finally {
+        setIsLoadingVisits(false);
+      }
+    };
+
+    fetchVisits();
+  }, [selectedBuildingId]);
+
+  const filteredVisits = visits.filter((visit) => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return true;
+    return (
+      visit.name.toLowerCase().includes(query) ||
+      visit.buildingName.toLowerCase().includes(query) ||
+      visit.approvedBy.toLowerCase().includes(query) ||
+      visit.remarks.toLowerCase().includes(query) ||
+      visit.dateTime.toLowerCase().includes(query)
+    );
+  });
 
   const notifications = [
     { id: 1, message: "New visit logged for Building 1", time: "1 min ago", type: "info" },
@@ -104,7 +250,7 @@ export default function VisitHistory() {
       </div>
 
       {/* Search and Sort Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="relative w-full max-w-md">
           <input
             type="text"
@@ -127,45 +273,70 @@ export default function VisitHistory() {
             />
           </svg>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm text-gray-700 w-full sm:w-auto justify-center">
-          <span>Sort By: Date</span>
-          <svg
-            className="w-4 h-4 text-gray-600"
-            fill="currentColor"
-            viewBox="0 0 20 20"
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <select
+            value={selectedBuildingId}
+            onChange={(event) => setSelectedBuildingId(event.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 focus:border-transparent text-sm"
+            disabled={isLoadingBuildings || buildings.length === 0}
           >
-            <path
-              fillRule="evenodd"
-              d="M3 3a1 1 0 000 2v11a1 1 0 102 0V5h10a1 1 0 100-2H3zm11 8a1 1 0 01-1 1H6a1 1 0 110-2h7a1 1 0 011 1zm-1 4a1 1 0 100-2H6a1 1 0 100 2h7z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </button>
+            {isLoadingBuildings && <option>Loading buildings...</option>}
+            {!isLoadingBuildings && buildings.length === 0 && (
+              <option value="">No buildings available</option>
+            )}
+            {!isLoadingBuildings &&
+              buildings.map((building) => (
+                <option key={building.id} value={building.id}>
+                  {building.name}
+                </option>
+              ))}
+          </select>
+        </div>
       </div>
 
       {/* Visit History Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        {error && (
+          <div className="px-4 py-3 text-sm text-red-600 bg-red-50 border-b border-red-100">
+            {error}
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[600px]">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-3 sm:px-6 py-3 text-left text-sm font-semibold text-gray-800">Name</th>
-                <th className="px-3 sm:px-6 py-3 text-left text-sm font-semibold text-gray-800">Building Name</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-sm font-semibold text-gray-800">Name</th>
                 <th className="px-3 sm:px-6 py-3 text-left text-sm font-semibold text-gray-800">Approved by</th>
                 <th className="px-3 sm:px-6 py-3 text-left text-sm font-semibold text-gray-800">Remarks</th>
                 <th className="px-3 sm:px-6 py-3 text-left text-sm font-semibold text-gray-800">Date and Time</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredVisits.map((visit, index) => (
-                <tr key={index} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-3 sm:px-6 py-4 text-sm text-gray-700">{visit.name}</td>
-                  <td className="px-3 sm:px-6 py-4 text-sm text-gray-700">{visit.buildingName}</td>
-                  <td className="px-3 sm:px-6 py-4 text-sm text-gray-700">{visit.approvedBy}</td>
-                  <td className="px-3 sm:px-6 py-4 text-sm text-gray-700">{visit.remarks}</td>
-                  <td className="px-3 sm:px-6 py-4 text-sm text-gray-700">{visit.dateTime}</td>
+              {isLoadingVisits && (
+                <tr>
+                  <td colSpan={5} className="px-3 sm:px-6 py-6 text-center text-sm text-gray-500">
+                    Loading visits...
+                  </td>
                 </tr>
-              ))}
+              )}
+              {!isLoadingVisits && filteredVisits.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-3 sm:px-6 py-6 text-center text-sm text-gray-500">
+                    No visit history found for the selected building.
+                  </td>
+                </tr>
+              )}
+              {!isLoadingVisits &&
+                filteredVisits.map((visit) => (
+                  <tr key={visit.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-3 sm:px-6 py-4 text-sm text-gray-700">{visit.name}</td>
+                    <td className="px-3 sm:px-6 py-4 text-sm text-gray-700">{visit.buildingName}</td>
+                    <td className="px-3 sm:px-6 py-4 text-sm text-gray-700">{visit.approvedBy}</td>
+                    <td className="px-3 sm:px-6 py-4 text-sm text-gray-700">{visit.remarks}</td>
+                    <td className="px-3 sm:px-6 py-4 text-sm text-gray-700">{visit.dateTime}</td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>

@@ -1,11 +1,78 @@
-import React from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import Profile from '../components/Profile';
+import { api } from '../utils/api';
+import filterIcon from '../assets/filter.png';
+
+const resolvePath = (object, path) =>
+  path.split('.').reduce((acc, key) => (acc == null ? acc : acc[key]), object);
+
+const pickValue = (object, paths) => {
+  for (const path of paths) {
+    const value = resolvePath(object, path);
+    if (value !== undefined && value !== null && value !== '') {
+      return value;
+    }
+  }
+  return undefined;
+};
+
+const toDisplayString = (value, fallback = '') => {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+  if (Array.isArray(value)) {
+    return value.map((item) => toDisplayString(item, '')).filter(Boolean).join(', ') || fallback;
+  }
+  if (typeof value === 'object') {
+    const entries = Object.values(value)
+      .map((item) => toDisplayString(item, ''))
+      .filter(Boolean);
+    return entries.join(', ') || fallback;
+  }
+  return fallback;
+};
+
+const extractArray = (payload, visited = new WeakSet()) => {
+  if (!payload || visited.has(payload)) return [];
+  if (Array.isArray(payload)) return payload;
+
+  visited.add(payload);
+
+  const candidates = [
+    payload.data,
+    payload.results,
+    payload.items,
+    payload.users,
+    payload?.data?.users,
+    payload?.data?.items,
+    payload?.data?.results,
+    payload?.data?.data,
+    payload?.data?.docs,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate;
+    if (candidate && typeof candidate === 'object') {
+      const nested = extractArray(candidate, visited);
+      if (nested.length) return nested;
+    }
+  }
+
+  return [];
+};
 
 export default function AdminControl() {
-  const [showModal, setShowModal] = React.useState(false);
-  const [searchTerm, setSearchTerm] = React.useState("");
-  const [showNotifications, setShowNotifications] = React.useState(false);
-  const [formData, setFormData] = React.useState({
+  const [showModal, setShowModal] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [admins, setAdmins] = useState([]);
+  const [isLoadingAdmins, setIsLoadingAdmins] = useState(false);
+  const [adminsError, setAdminsError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionError, setSubmissionError] = useState('');
+  const [submissionMessage, setSubmissionMessage] = useState('');
+
+  const [formData, setFormData] = useState({
     name: "",
     buildingName: "",
     buildingAddress: "",
@@ -23,73 +90,91 @@ export default function AdminControl() {
     }));
   };
 
+  const fetchAdmins = useCallback(async () => {
+    setIsLoadingAdmins(true);
+    setAdminsError('');
+    try {
+      const response = await api.getAllUsers('?limit=100');
+      const normalized = extractArray(response).map((item, index) => ({
+        id: pickValue(item, ['_id', 'id', 'userId']) ?? `admin-${index}`,
+        name: toDisplayString(
+          pickValue(item, ['name', 'fullName', 'username']),
+          'Unknown Admin'
+        ),
+        building: toDisplayString(
+          pickValue(item, ['buildingName', 'building.name']),
+          'Not assigned'
+        ),
+        email: toDisplayString(pickValue(item, ['email']), 'Email unavailable'),
+        phoneNumber: toDisplayString(
+          pickValue(item, ['phoneNumber', 'contactNumber']),
+          'Phone unavailable'
+        ),
+        role: toDisplayString(pickValue(item, ['role']), 'ADMIN'),
+        details:
+          toDisplayString(pickValue(item, ['details', 'description'])) ||
+          `Email: ${toDisplayString(pickValue(item, ['email']), 'N/A')} · Phone: ${toDisplayString(
+            pickValue(item, ['phoneNumber', 'contactNumber']),
+            'N/A'
+          )}`,
+      }));
+      setAdmins(normalized);
+    } catch (err) {
+      console.error('Failed to fetch admins', err);
+      setAdminsError(err.message || 'Unable to load admins');
+      setAdmins([]);
+    } finally {
+      setIsLoadingAdmins(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAdmins();
+  }, [fetchAdmins]);
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log("Form submitted:", formData);
-    setShowModal(false);
-    setFormData({
-      name: "",
-      buildingName: "",
-      buildingAddress: "",
-      phoneNumber: "",
-      securityGuards: "",
-      employees: "",
-      allowLogin: true,
-    });
+    setSubmissionError('');
+    setSubmissionMessage('');
+
+    const payload = {
+      name: formData.name,
+      buildingName: formData.buildingName,
+      buildingAddress: formData.buildingAddress,
+      phoneNumber: formData.phoneNumber,
+      securityGuards: formData.securityGuards,
+      employees: formData.employees,
+      allowLogin: formData.allowLogin,
+    };
+
+    const submitAdmin = async () => {
+      setIsSubmitting(true);
+      try {
+        await api.createAdmin(payload);
+        setSubmissionMessage('Admin created successfully.');
+        setShowModal(false);
+        setFormData({
+          name: "",
+          buildingName: "",
+          buildingAddress: "",
+          phoneNumber: "",
+          securityGuards: "",
+          employees: "",
+          allowLogin: true,
+        });
+        await fetchAdmins();
+      } catch (err) {
+        console.error('Failed to create admin', err);
+        setSubmissionError(err.message || 'Unable to create admin');
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
+
+    submitAdmin();
   };
 
-  const adminData = [
-    {
-      name: "Jessica Jane",
-      building: "Building 1",
-      details:
-        "Admin for Building 1 located at location 1, area, city. Phone Number: 9343657281",
-      securityGuards: 5,
-      buildingEmployees: 20,
-    },
-    {
-      name: "Jessica Jane",
-      building: "Building 1",
-      details:
-        "Admin for Building 1 located at location 1, area, city. Phone Number: 9343657281",
-      securityGuards: 5,
-      buildingEmployees: 20,
-    },
-    {
-      name: "Jessica Jane",
-      building: "Building 1",
-      details:
-        "Admin for Building 1 located at location 1, area, city. Phone Number: 9343657281",
-      securityGuards: 5,
-      buildingEmployees: 20,
-    },
-    {
-      name: "Jessica Jane",
-      building: "Building 1",
-      details:
-        "Admin for Building 1 located at location 1, area, city. Phone Number: 9343657281",
-      securityGuards: 5,
-      buildingEmployees: 20,
-    },
-    {
-      name: "Jessica Jane",
-      building: "Building 1",
-      details:
-        "Admin for Building 1 located at location 1, area, city. Phone Number: 9343657281",
-      securityGuards: 5,
-      buildingEmployees: 20,
-    },
-    {
-      name: "Jessica Jane",
-      building: "Building 1",
-      details:
-        "Admin for Building 1 located at location 1, area, city. Phone Number: 9343657281",
-      securityGuards: 5,
-      buildingEmployees: 20,
-    },
-  ];
-
-  const filteredAdmins = adminData.filter(admin =>
+  const filteredAdmins = admins.filter(admin =>
     admin.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     admin.building.toLowerCase().includes(searchTerm.toLowerCase()) ||
     admin.details.toLowerCase().includes(searchTerm.toLowerCase())
@@ -191,17 +276,7 @@ export default function AdminControl() {
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
           <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 hover:bg-gray-50 transition justify-center">
-            <svg
-              className="w-4 h-4 text-gray-600"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
-              <path
-                fillRule="evenodd"
-                d="M3 3a1 1 0 000 2v11a1 1 0 102 0V5h10a1 1 0 100-2H3zm11 8a1 1 0 01-1 1H6a1 1 0 110-2h7a1 1 0 011 1zm-1 4a1 1 0 100-2H6a1 1 0 100 2h7z"
-                clipRule="evenodd"
-              />
-            </svg>
+            <img src={filterIcon} alt="Filter list" className="w-4 h-4 object-contain" />
             Sort By: A to Z
           </button>
 
@@ -225,11 +300,39 @@ export default function AdminControl() {
         </div>
       </div>
 
+      {adminsError && (
+        <div className="mb-6 px-4 py-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg">
+          {adminsError}
+        </div>
+      )}
+
+      {submissionMessage && (
+        <div className="mb-6 px-4 py-3 text-sm text-green-600 bg-green-50 border border-green-100 rounded-lg">
+          {submissionMessage}
+        </div>
+      )}
+
+      {submissionError && (
+        <div className="mb-6 px-4 py-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg">
+          {submissionError}
+        </div>
+      )}
+
       {/* Admin cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredAdmins.map((admin, index) => (
+        {isLoadingAdmins && (
+          <div className="col-span-full text-center text-sm text-gray-500 py-6">
+            Loading admins...
+          </div>
+        )}
+        {!isLoadingAdmins && filteredAdmins.length === 0 && (
+          <div className="col-span-full text-center text-sm text-gray-500 py-6">
+            No admins found.
+          </div>
+        )}
+        {!isLoadingAdmins && filteredAdmins.map((admin) => (
           <div
-            key={index}
+            key={admin.id}
             className="p-4 rounded-lg border border-[#b00020] bg-white shadow-sm hover:shadow-md transition"
           >
             <div className="flex items-start gap-3 mb-3">
@@ -253,19 +356,19 @@ export default function AdminControl() {
             <div className="flex justify-start gap-6 text-xs">
               <div className="flex items-center gap-1.5">
                 <span className="w-4 h-4 flex items-center justify-center rounded-full bg-[#b00020] text-white text-[10px]">
-                  S
+                  R
                 </span>
                 <span className="text-gray-700">
-                  {admin.securityGuards} Security Guards
+                  Role: {admin.role}
                 </span>
               </div>
 
               <div className="flex items-center gap-1.5">
                 <span className="w-4 h-4 flex items-center justify-center rounded-full bg-[#b00020] text-white text-[10px]">
-                  E
+                  P
                 </span>
                 <span className="text-gray-700">
-                  {admin.buildingEmployees} Building Employees
+                  {admin.phoneNumber}
                 </span>
               </div>
             </div>
@@ -278,7 +381,14 @@ export default function AdminControl() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-md rounded-lg shadow-xl p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="font-semibold text-lg text-gray-800">Add Admin</h3>
+              <div className="flex items-center gap-3">
+                <button className="w-8 h-8 flex items-center justify-center bg-white border border-gray-200 rounded-lg">
+                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
+                <h3 className="font-semibold text-lg text-gray-800">Admin</h3>
+              </div>
               <button
                 onClick={() => setShowModal(false)}
                 className="text-gray-400 hover:text-gray-600"
@@ -300,12 +410,12 @@ export default function AdminControl() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Building Name</label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Name</label>
                 <input
                   name="buildingName"
                   value={formData.buildingName}
                   onChange={handleInputChange}
-                  placeholder="Enter building name"
+                  placeholder="Enter name"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#b00020]"
                 />
               </div>
@@ -347,15 +457,15 @@ export default function AdminControl() {
 
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">No. of Employees</label>
-                  <input
+                <input
                   name="employees"
                   type="number"
                   value={formData.employees}
-                    onChange={handleInputChange}
+                  onChange={handleInputChange}
                   placeholder="Enter number of employees"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#b00020]"
-                  />
-                </div>
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#b00020]"
+                />
+              </div>
 
               <div className="flex items-center justify-between pt-1">
                 <span className="text-xs text-gray-700">Allow the admin to login to the app</span>
@@ -389,9 +499,10 @@ export default function AdminControl() {
               <div className="pt-2">
                 <button
                   type="submit"
-                  className="w-full py-2.5 bg-[#b00020] text-white rounded-md text-sm font-medium"
+                  className="w-full py-2.5 bg-[#b00020] text-white rounded-md text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                  disabled={isSubmitting}
                 >
-                  Add Admin
+                  {isSubmitting ? 'Adding...' : 'Add Admin'}
                 </button>
               </div>
             </form>
