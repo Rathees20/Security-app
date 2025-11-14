@@ -10,3 +10,9 @@
 - Decisions: Standardize filter icon via shared asset; keep styling consistent with existing buttons.
 - Next: Verify icon appearance in other pages if they add filter controls later.
 
+2025-11-14 14:30
+- Topics: Investigated Vercel login 404; adjusted API base URL resolution.
+- Code: Updated src/utils/api.js to use production backend URL whenever host isn't localhost/127.0.0.1, keeping /api proxy for local dev.
+- Decisions: Default to backend domain in hosted environments; continue honoring VITE_API_BASE_URL overrides.
+- Next: Retest login on Vercel deployment and set VITE_API_BASE_URL if future environments need custom hosts.
+
