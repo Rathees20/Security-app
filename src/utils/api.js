@@ -1,31 +1,28 @@
-const DEFAULT_REMOTE_BASE_URL = 'https://securityapp-backend.vercel.app/api';
-
-const normalizeBase = (value) => (value.endsWith('/') ? value.slice(0, -1) : value);
-
 const resolveBaseUrl = () => {
   try {
     const configured = typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL;
     if (configured) {
-      return normalizeBase(configured);
+      return configured.endsWith('/') ? configured.slice(0, -1) : configured;
     }
   } catch (err) {
     // noop - fall back to defaults below
   }
 
   if (typeof window !== 'undefined') {
-    const hostname = window.location?.hostname || '';
+    const hostname = window.location.hostname || '';
     const isLocalhost =
       hostname === 'localhost' ||
       hostname === '127.0.0.1' ||
-      hostname === '[::1]' ||
       hostname.endsWith('.local');
 
     if (isLocalhost) {
       return '/api';
     }
+
+    return 'https://securityapp-backend.vercel.app/api';
   }
 
-  return DEFAULT_REMOTE_BASE_URL;
+  return 'https://securityapp-backend.vercel.app/api';
 };
 
 const BASE_URL = resolveBaseUrl();
@@ -77,18 +74,12 @@ export async function apiRequest(path, { method = 'GET', headers = {}, body, isF
     requestInit.body = isFormData ? body : JSON.stringify(body);
   }
 
-  const url = buildUrl(path);
-  const response = await fetch(url, requestInit);
+  const response = await fetch(buildUrl(path), requestInit);
   const data = await parseResponse(response);
 
   if (!response.ok || data?.success === false) {
-    const errorMessage = data?.message || response.statusText || 'Request failed';
-    const error = new Error(
-      response.status ? `${errorMessage} (status ${response.status})` : errorMessage
-    );
-    error.status = response.status;
-    error.url = url;
-    throw error;
+    const errorMessage = data?.message || 'Request failed';
+    throw new Error(errorMessage);
   }
 
   return data;
