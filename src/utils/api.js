@@ -9,13 +9,10 @@ const resolveBaseUrl = () => {
   }
 
   if (typeof window !== 'undefined') {
-    if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
-      return '/api';
-    }
-    return 'https://securityapp-backend.vercel.app/api';
+    return '/api';
   }
 
-  return process.env?.VITE_API_BASE_URL || 'https://securityapp-backend.vercel.app/api';
+  return 'https://securityapp-backend.vercel.app/api';
 };
 
 const BASE_URL = resolveBaseUrl();

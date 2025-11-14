@@ -10,9 +10,3 @@
 - Decisions: Standardize filter icon via shared asset; keep styling consistent with existing buttons.
 - Next: Verify icon appearance in other pages if they add filter controls later.
 
-2025-11-14 14:40
-- Topics: Investigated Vercel 404s for auth routes, admin pages, and favicons.
-- Code: Updated src/utils/api.js base URL resolution, cleaned up index.html head tags, added public/favicon.png and public/favicon.ico, introduced vercel.json SPA rewrite.
-- Decisions: Force production API calls to use backend origin, ensure single-page app routes rewrite to index.html, serve lightweight custom favicon assets.
-- Next: Redeploy to Vercel and confirm /api/auth/login, /admins, /signin-success, and favicon requests succeed.
-
