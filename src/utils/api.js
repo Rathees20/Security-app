@@ -9,17 +9,7 @@ const resolveBaseUrl = () => {
   }
 
   if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname || '';
-    const isLocalhost =
-      hostname === 'localhost' ||
-      hostname === '127.0.0.1' ||
-      hostname.endsWith('.local');
-
-    if (isLocalhost) {
-      return '/api';
-    }
-
-    return 'https://securityapp-backend.vercel.app/api';
+    return '/api';
   }
 
   return 'https://securityapp-backend.vercel.app/api';

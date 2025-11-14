@@ -10,9 +10,3 @@
 - Decisions: Standardize filter icon via shared asset; keep styling consistent with existing buttons.
 - Next: Verify icon appearance in other pages if they add filter controls later.
 
-2025-11-14 12:40
-- Topics: Investigated Vercel login failures; ensured frontend hits deployed backend.
-- Code: Updated src/utils/api.js resolveBaseUrl to use localhost-only proxy and fall back to https://securityapp-backend.vercel.app/api elsewhere.
-- Decisions: Treat localhost hosts as proxy targets; send production requests directly to backend URL.
-- Next: Retest login on Vercel deployment to confirm fix works end-to-end.
-
