@@ -16,3 +16,9 @@
 - Decisions: Default to backend domain in hosted environments; continue honoring VITE_API_BASE_URL overrides.
 - Next: Retest login on Vercel deployment and set VITE_API_BASE_URL if future environments need custom hosts.
 
+2025-11-14 14:45
+- Topics: Fixed hosted login CORS failure via same-origin proxy strategy.
+- Code: src/utils/api.js now always uses /api in browser; added vercel.json rewrite to proxy /api/* to backend domain.
+- Decisions: Rely on platform rewrites for deployments while keeping dev proxy in vite.config.
+- Next: Deploy with new rewrite and retest login on security-app-iota.vercel.app.
+

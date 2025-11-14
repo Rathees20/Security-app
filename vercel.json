@@ -1,0 +1,9 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://securityapp-backend.vercel.app/api/$1"
+    }
+  ]
+}
+
