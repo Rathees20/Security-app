@@ -10,3 +10,9 @@
 - Decisions: Standardize filter icon via shared asset; keep styling consistent with existing buttons.
 - Next: Verify icon appearance in other pages if they add filter controls later.
 
+2025-11-14 14:10
+- Topics: Renamed all “Building Name” labels to “Name”; updated API base resolution to fix Vercel login NOT_FOUND error.
+- Code: Edited src/pages/SocietyControl.jsx, src/pages/AdminControl.jsx, src/pages/VisitHistory.jsx, and src/utils/api.js for naming changes and smarter base URL handling.
+- Decisions: Detect localhost to keep `/api` proxy locally, otherwise fall back to https://securityapp-backend.vercel.app/api and enrich API error details with status/url.
+- Next: Re-test sign-in on Vercel (and set VITE_API_BASE_URL if backend URL changes) to confirm authentication succeeds.
+
