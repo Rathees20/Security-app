@@ -22,3 +22,63 @@
 - Decisions: Rely on platform rewrites for deployments while keeping dev proxy in vite.config.
 - Next: Deploy with new rewrite and retest login on security-app-iota.vercel.app.
 
+2025-11-14 15:20
+- Topics: Resolved admin registration validation errors by supplying required auth fields.
+- Code: Updated src/pages/AdminControl.jsx form state, validations, and modal inputs for email/password/role so payload matches backend expectations.
+- Decisions: Default role to ADMIN with optional SUPER_ADMIN selection; validate email format and password length before calling /auth/register.
+- Next: Retest admin creation end-to-end against backend to ensure successful registration.
+
+2025-11-14 15:40
+- Topics: Addressed backend requirements for role casing and confirm password on admin registration.
+- Code: Added confirmPassword field + validation, introduced ROLE_OPTIONS with lowercase API values, and ensured payload includes confirmPassword and backend-accepted role strings.
+- Decisions: Default role value to `admin`, keep UI labels friendly, surface mismatch errors before API call.
+- Next: Re-run admin creation against backend to confirm 200/201 response with new payload.
+
+2025-11-14 16:00
+- Topics: Synchronized admin role selector with backend-provided roles to stop invalid submissions.
+- Code: Updated src/pages/AdminControl.jsx to derive role options from fetched admins, auto-select a valid role when the modal opens, and fall back to defaults only when no roles are returned.
+- Decisions: Prefer backend data for role values; keep UI labels human-readable while submitting exact backend strings.
+- Next: Retry admin creation to confirm the newly selected backend role is accepted.
+
+2025-11-14 16:15
+- Topics: Restored employee and security guard counts on admin cards.
+- Code: Reintroduced employees/securityGuards normalization in src/pages/AdminControl.jsx and rendered SG/E chips in each admin card.
+- Decisions: Keep detailed metadata in cards for quick scanning while maintaining minimal payload changes elsewhere.
+- Next: Manually verify the counts display for existing admins once data is reloaded.
+
+2025-11-14 16:30
+- Topics: Enhanced admin normalization to sniff employee/guard counts from nested backend fields.
+- Code: src/pages/AdminControl.jsx now auto-detects numeric values with “employee/guard/security” keywords before falling back to the legacy keys so card stats reflect API data even when field names change.
+- Decisions: Use keyword-based scanning to avoid missing data; keep fallback to display-friendly defaults when none found.
+- Next: Reload admins and confirm the SG/E badges now mirror backend values.
+
+2025-11-14 16:45
+- Topics: Prevented empty/short building names from hitting the backend.
+- Code: Added trim + 2–100 char validation for buildingName in src/pages/SocietyControl.jsx and only submits when valid.
+- Decisions: Surface validation inline to avoid 400 errors; reuse trimmed value in payload.
+- Next: Retry building creation with valid names; consider similar checks for address if backend requires it.
+
+2025-11-14 17:05
+- Topics: Structured building address inputs to match backend schema.
+- Code: Updated SocietyControl modal/state to capture street/city/state/pincode/country, validate city length, and submit address fields using bracket notation within FormData.
+- Decisions: Default country to India, keep optional fields optional, and ensure payload matches BuildingController expectations without overfetching.
+- Next: Test building creation with full address to confirm backend accepts the structured payload; extend validations if backend demands more fields.
+
+2025-11-14 17:20
+- Topics: Switched SocietyControl submission to JSON when no image to fix backend validation.
+- Code: Added shared address payload builder, branched between FormData (with bracket notation) when an image is present and plain JSON otherwise; modal now exposes all address inputs.
+- Decisions: Avoid unnecessary multipart requests to keep backend validators happy while still supporting image uploads.
+- Next: Retry building creation without an image to confirm the backend accepts the JSON payload; test image uploads afterward.
+
+2025-11-14 17:35
+- Topics: Added security-role requirements (building + employee code) to admin creation.
+- Code: AdminControl fetches building options when needed, shows conditional inputs, validates them, and includes `buildingId`/`employeeCode` in the payload for security users.
+- Decisions: Only load buildings when modal + security role are active; keep other roles unaffected.
+- Next: Test creating a security user to ensure backend validations pass.
+
+2025-11-14 17:45
+- Topics: Fixed empty building dropdown for security role.
+- Code: Expanded AdminControl’s extractArray helper to look for `buildings` and `data.buildings`, ensuring the building fetch populates the select.
+- Decisions: Mirror SocietyControl’s extraction logic so all endpoints returning `data.buildings` work consistently.
+- Next: Reopen the Add Admin modal with role=Security and confirm building options now appear.
+

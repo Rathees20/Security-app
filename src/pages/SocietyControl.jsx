@@ -88,7 +88,11 @@ export default function SocietyControl() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [formData, setFormData] = useState({
     buildingName: '',
-    buildingAddress: '',
+    street: '',
+    city: '',
+    state: '',
+    pincode: '',
+    country: 'India',
     securityGuards: '',
     employees: '',
     image: null
@@ -117,25 +121,66 @@ export default function SocietyControl() {
     setSubmissionMessage('');
     setSubmissionError('');
 
-    const formPayload = new FormData();
-    formPayload.append('name', formData.buildingName);
-    formPayload.append('address', formData.buildingAddress);
-    formPayload.append('securityGuards', formData.securityGuards);
-    formPayload.append('employees', formData.employees);
-    formPayload.append('allowLogin', String(allowLogin));
-    if (formData.image) {
+    const trimmedName = formData.buildingName.trim();
+    if (trimmedName.length < 2 || trimmedName.length > 100) {
+      setSubmissionError('Building name must be between 2 and 100 characters.');
+      return;
+    }
+
+    const trimmedCity = formData.city.trim();
+    const trimmedCountry = formData.country.trim() || 'India';
+
+    if (trimmedCity && trimmedCity.length < 2) {
+      setSubmissionError('City must be at least 2 characters when provided.');
+      return;
+    }
+
+    const addressPayload = {};
+    if (formData.street.trim()) addressPayload.street = formData.street.trim();
+    if (trimmedCity) addressPayload.city = trimmedCity;
+    if (formData.state.trim()) addressPayload.state = formData.state.trim();
+    if (formData.pincode.trim()) addressPayload.pincode = formData.pincode.trim();
+    addressPayload.country = trimmedCountry;
+
+    const hasImage = Boolean(formData.image);
+    let submissionPayload;
+
+    if (hasImage) {
+      const formPayload = new FormData();
+      formPayload.append('name', trimmedName);
+      Object.entries(addressPayload).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          formPayload.append(`address[${key}]`, value);
+        }
+      });
+      formPayload.append('securityGuards', formData.securityGuards);
+      formPayload.append('employees', formData.employees);
+      formPayload.append('allowLogin', String(allowLogin));
       formPayload.append('image', formData.image);
+      submissionPayload = formPayload;
+    } else {
+      submissionPayload = {
+        name: trimmedName,
+        address: addressPayload,
+        securityGuards: formData.securityGuards,
+        employees: formData.employees,
+        allowLogin,
+      };
     }
 
     const submitBuilding = async () => {
       setIsSubmitting(true);
       try {
-        await api.createBuilding(formPayload);
+        await api.createBuilding(submissionPayload);
         setSubmissionMessage('Building added successfully.');
         setIsModalOpen(false);
         setFormData({
           buildingName: '',
-          buildingAddress: '',
+          street: '',
+          city: '',
+          state: '',
+          pincode: '',
+          country: 'India',
           securityGuards: '',
           employees: '',
           image: null
@@ -412,14 +457,62 @@ export default function SocietyControl() {
                 className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B00020] focus:border-transparent text-sm"
               />
             </div>
-            
-            {/* Building Address */}
+
+            {/* Street */}
             <div className="mb-3">
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Building Address</label>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">Street</label>
               <input
                 type="text"
-                name="buildingAddress"
-                value={formData.buildingAddress}
+                name="street"
+                value={formData.street}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B00020] focus:border-transparent text-sm"
+              />
+            </div>
+
+            {/* City */}
+            <div className="mb-3">
+              <label className="block text-sm font-medium text-neutral-700 mb-1">City</label>
+              <input
+                type="text"
+                name="city"
+                value={formData.city}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B00020] focus:border-transparent text-sm"
+              />
+            </div>
+
+            {/* State */}
+            <div className="mb-3">
+              <label className="block text-sm font-medium text-neutral-700 mb-1">State</label>
+              <input
+                type="text"
+                name="state"
+                value={formData.state}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B00020] focus:border-transparent text-sm"
+              />
+            </div>
+
+            {/* Pincode */}
+            <div className="mb-3">
+              <label className="block text-sm font-medium text-neutral-700 mb-1">Pincode</label>
+              <input
+                type="text"
+                name="pincode"
+                value={formData.pincode}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B00020] focus:border-transparent text-sm"
+              />
+            </div>
+
+            {/* Country */}
+            <div className="mb-3">
+              <label className="block text-sm font-medium text-neutral-700 mb-1">Country</label>
+              <input
+                type="text"
+                name="country"
+                value={formData.country}
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B00020] focus:border-transparent text-sm"
               />

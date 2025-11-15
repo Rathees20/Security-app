@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Profile from '../components/Profile';
 import { api } from '../utils/api';
 import filterIcon from '../assets/filter.png';
@@ -13,6 +13,38 @@ const pickValue = (object, paths) => {
       return value;
     }
   }
+  return undefined;
+};
+
+const findNumericByKeyword = (payload, keywords) => {
+  if (!payload || typeof payload !== 'object') return undefined;
+
+  const stack = [payload];
+  const seen = new WeakSet();
+
+  while (stack.length) {
+    const current = stack.pop();
+    if (!current || typeof current !== 'object' || seen.has(current)) continue;
+    seen.add(current);
+
+    Object.entries(current).forEach(([key, value]) => {
+      if (value && typeof value === 'object') {
+        stack.push(value);
+        return;
+      }
+
+      if (
+        (typeof value === 'string' || typeof value === 'number') &&
+        keywords.some((keyword) => key.toLowerCase().includes(keyword))
+      ) {
+        const parsed = typeof value === 'string' ? value.trim() : value;
+        if (parsed !== '' && parsed !== null && parsed !== undefined) {
+          return parsed;
+        }
+      }
+    });
+  }
+
   return undefined;
 };
 
@@ -40,9 +72,11 @@ const extractArray = (payload, visited = new WeakSet()) => {
 
   const candidates = [
     payload.data,
+    payload.buildings,
     payload.results,
     payload.items,
     payload.users,
+    payload?.data?.buildings,
     payload?.data?.users,
     payload?.data?.items,
     payload?.data?.results,
@@ -61,6 +95,11 @@ const extractArray = (payload, visited = new WeakSet()) => {
   return [];
 };
 
+const DEFAULT_ROLE_OPTIONS = [
+  { value: 'admin', label: 'Admin' },
+  { value: 'super_admin', label: 'Super Admin' },
+];
+
 export default function AdminControl() {
   const [showModal, setShowModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -74,6 +113,12 @@ export default function AdminControl() {
 
   const [formData, setFormData] = useState({
     name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    role: DEFAULT_ROLE_OPTIONS[0].value,
+    buildingId: "",
+    employeeCode: "",
     buildingName: "",
     buildingAddress: "",
     phoneNumber: "",
@@ -81,6 +126,9 @@ export default function AdminControl() {
     employees: "",
     allowLogin: true,
   });
+  const [buildingOptions, setBuildingOptions] = useState([]);
+  const [isLoadingBuildingOptions, setIsLoadingBuildingOptions] = useState(false);
+  const [buildingOptionsError, setBuildingOptionsError] = useState('');
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -95,29 +143,55 @@ export default function AdminControl() {
     setAdminsError('');
     try {
       const response = await api.getAllUsers('?limit=100');
-      const normalized = extractArray(response).map((item, index) => ({
-        id: pickValue(item, ['_id', 'id', 'userId']) ?? `admin-${index}`,
-        name: toDisplayString(
-          pickValue(item, ['name', 'fullName', 'username']),
-          'Unknown Admin'
-        ),
-        building: toDisplayString(
-          pickValue(item, ['buildingName', 'building.name']),
-          'Not assigned'
-        ),
-        email: toDisplayString(pickValue(item, ['email']), 'Email unavailable'),
-        phoneNumber: toDisplayString(
-          pickValue(item, ['phoneNumber', 'contactNumber']),
-          'Phone unavailable'
-        ),
-        role: toDisplayString(pickValue(item, ['role']), 'ADMIN'),
-        details:
-          toDisplayString(pickValue(item, ['details', 'description'])) ||
-          `Email: ${toDisplayString(pickValue(item, ['email']), 'N/A')} · Phone: ${toDisplayString(
+      const normalized = extractArray(response).map((item, index) => {
+        const employeeCount =
+          findNumericByKeyword(item, ['employee', 'staff']) ??
+          pickValue(item, [
+            'employees',
+            'employeeCount',
+            'staffCount',
+            'noOfEmployees',
+            'numberOfEmployees',
+            'numEmployees',
+          ]);
+
+        const securityGuardCount =
+          findNumericByKeyword(item, ['guard', 'security']) ??
+          pickValue(item, [
+            'securityGuards',
+            'guardCount',
+            'securityGuardCount',
+            'noOfSecurityGuards',
+            'numberOfSecurityGuards',
+            'numSecurityGuards',
+          ]);
+
+        return {
+          id: pickValue(item, ['_id', 'id', 'userId']) ?? `admin-${index}`,
+          name: toDisplayString(
+            pickValue(item, ['name', 'fullName', 'username']),
+            'Unknown Admin'
+          ),
+          building: toDisplayString(
+            pickValue(item, ['buildingName', 'building.name']),
+            'Not assigned'
+          ),
+          email: toDisplayString(pickValue(item, ['email']), 'Email unavailable'),
+          phoneNumber: toDisplayString(
             pickValue(item, ['phoneNumber', 'contactNumber']),
-            'N/A'
-          )}`,
-      }));
+            'Phone unavailable'
+          ),
+          employees: toDisplayString(employeeCount, '0'),
+          securityGuards: toDisplayString(securityGuardCount, '0'),
+          role: toDisplayString(pickValue(item, ['role']), 'ADMIN'),
+          details:
+            toDisplayString(pickValue(item, ['details', 'description'])) ||
+            `Email: ${toDisplayString(pickValue(item, ['email']), 'N/A')} · Phone: ${toDisplayString(
+              pickValue(item, ['phoneNumber', 'contactNumber']),
+              'N/A'
+            )}`,
+        };
+      });
       setAdmins(normalized);
     } catch (err) {
       console.error('Failed to fetch admins', err);
@@ -132,13 +206,139 @@ export default function AdminControl() {
     fetchAdmins();
   }, [fetchAdmins]);
 
+  const availableRoles = useMemo(() => {
+    const seen = new Map();
+
+    admins.forEach((admin) => {
+      const roleValue = admin?.role;
+      if (!roleValue || typeof roleValue !== 'string') return;
+      const trimmed = roleValue.trim();
+      if (!trimmed || seen.has(trimmed)) return;
+
+      const prettyLabel = trimmed
+        .replace(/[_\s]+/g, ' ')
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+
+      seen.set(trimmed, {
+        value: trimmed,
+        label: prettyLabel || trimmed,
+      });
+    });
+
+    if (seen.size > 0) {
+      return Array.from(seen.values());
+    }
+
+    return DEFAULT_ROLE_OPTIONS;
+  }, [admins]);
+
+  useEffect(() => {
+    if (!showModal || !availableRoles.length) {
+      return;
+    }
+
+    setFormData((prev) => {
+      const hasValidRole = availableRoles.some((option) => option.value === prev.role);
+      if (hasValidRole) {
+        return prev;
+      }
+      return {
+        ...prev,
+        role: availableRoles[0].value,
+      };
+    });
+  }, [availableRoles, showModal]);
+
+  const requiresSecurityFields = useMemo(
+    () => formData.role?.toLowerCase() === 'security',
+    [formData.role]
+  );
+
+  const fetchBuildingOptions = useCallback(async () => {
+    setIsLoadingBuildingOptions(true);
+    setBuildingOptionsError('');
+    try {
+      const response = await api.getBuildings();
+      const normalized = extractArray(response).map((item, index) => ({
+        id: pickValue(item, ['_id', 'id', 'buildingId']) ?? `building-${index}`,
+        name: toDisplayString(
+          pickValue(item, ['name', 'buildingName', 'title']),
+          'Unnamed Building'
+        ),
+        address: toDisplayString(
+          pickValue(item, ['address.full', 'address', 'location', 'buildingAddress']),
+          ''
+        ),
+      }));
+      setBuildingOptions(normalized);
+    } catch (err) {
+      console.error('Failed to fetch buildings', err);
+      setBuildingOptions([]);
+      setBuildingOptionsError(err.message || 'Unable to load buildings');
+    } finally {
+      setIsLoadingBuildingOptions(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!showModal || !requiresSecurityFields) {
+      return;
+    }
+    fetchBuildingOptions();
+  }, [fetchBuildingOptions, requiresSecurityFields, showModal]);
+
   const handleSubmit = (e) => {
     e.preventDefault();
     setSubmissionError('');
     setSubmissionMessage('');
 
+    const trimmedEmail = formData.email.trim();
+    const name = formData.name.trim();
+    const role = formData.role?.trim();
+
+    if (!name) {
+      setSubmissionError('Name is required.');
+      return;
+    }
+
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!trimmedEmail || !emailPattern.test(trimmedEmail)) {
+      setSubmissionError('Please enter a valid email address.');
+      return;
+    }
+
+    if (!formData.password || formData.password.length < 6) {
+      setSubmissionError('Password must be at least 6 characters long.');
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setSubmissionError('Passwords must match.');
+      return;
+    }
+
+    if (!role) {
+      setSubmissionError('Please select a role.');
+      return;
+    }
+
+    if (requiresSecurityFields) {
+      if (!formData.buildingId) {
+        setSubmissionError('Please select a building for security personnel.');
+        return;
+      }
+      if (!formData.employeeCode.trim()) {
+        setSubmissionError('Employee code is required for security personnel.');
+        return;
+      }
+    }
+
     const payload = {
-      name: formData.name,
+      name,
+      email: trimmedEmail,
+      password: formData.password,
+      confirmPassword: formData.confirmPassword,
+      role,
       buildingName: formData.buildingName,
       buildingAddress: formData.buildingAddress,
       phoneNumber: formData.phoneNumber,
@@ -146,6 +346,11 @@ export default function AdminControl() {
       employees: formData.employees,
       allowLogin: formData.allowLogin,
     };
+
+    if (requiresSecurityFields) {
+      payload.buildingId = formData.buildingId;
+      payload.employeeCode = formData.employeeCode.trim();
+    }
 
     const submitAdmin = async () => {
       setIsSubmitting(true);
@@ -155,6 +360,12 @@ export default function AdminControl() {
         setShowModal(false);
         setFormData({
           name: "",
+          email: "",
+          password: "",
+          confirmPassword: "",
+          role: availableRoles[0]?.value || DEFAULT_ROLE_OPTIONS[0].value,
+          buildingId: "",
+          employeeCode: "",
           buildingName: "",
           buildingAddress: "",
           phoneNumber: "",
@@ -372,6 +583,26 @@ export default function AdminControl() {
                 </span>
               </div>
             </div>
+
+          <div className="mt-3 flex justify-start gap-6 text-xs">
+            <div className="flex items-center gap-1.5">
+              <span className="w-4 h-4 flex items-center justify-center rounded-full bg-[#b00020] text-white text-[10px]">
+                SG
+              </span>
+              <span className="text-gray-700">
+                Guards: {admin.securityGuards}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <span className="w-4 h-4 flex items-center justify-center rounded-full bg-[#b00020] text-white text-[10px]">
+                E
+              </span>
+              <span className="text-gray-700">
+                Employees: {admin.employees}
+              </span>
+            </div>
+          </div>
           </div>
         ))}
       </div>
@@ -399,6 +630,42 @@ export default function AdminControl() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  name="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  placeholder="Enter email"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#b00020]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Password</label>
+                <input
+                  name="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  placeholder="Enter password"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#b00020]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Confirm Password</label>
+                <input
+                  name="confirmPassword"
+                  type="password"
+                  value={formData.confirmPassword}
+                  onChange={handleInputChange}
+                  placeholder="Re-enter password"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#b00020]"
+                />
+              </div>
+
+              <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Name</label>
                 <input
                   name="name"
@@ -410,12 +677,12 @@ export default function AdminControl() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Name</label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Building Name</label>
                 <input
                   name="buildingName"
                   value={formData.buildingName}
                   onChange={handleInputChange}
-                  placeholder="Enter name"
+                  placeholder="Enter building name"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#b00020]"
                 />
               </div>
@@ -466,6 +733,59 @@ export default function AdminControl() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#b00020]"
                 />
               </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Role</label>
+                <select
+                  name="role"
+                  value={formData.role}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#b00020] bg-white"
+                >
+                  {availableRoles.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {requiresSecurityFields && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Assign Building</label>
+                    <select
+                      name="buildingId"
+                      value={formData.buildingId}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#b00020] bg-white"
+                      disabled={isLoadingBuildingOptions}
+                    >
+                      <option value="">{isLoadingBuildingOptions ? 'Loading buildings...' : 'Select building'}</option>
+                      {buildingOptions.map((building) => (
+                        <option key={building.id} value={building.id}>
+                          {building.name}
+                          {building.address ? ` · ${building.address}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {buildingOptionsError && (
+                      <p className="mt-1 text-xs text-red-600">{buildingOptionsError}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Employee Code</label>
+                    <input
+                      name="employeeCode"
+                      value={formData.employeeCode}
+                      onChange={handleInputChange}
+                      placeholder="Enter employee code"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#b00020]"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-center justify-between pt-1">
                 <span className="text-xs text-gray-700">Allow the admin to login to the app</span>
