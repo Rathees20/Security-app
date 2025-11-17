@@ -7,7 +7,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'https://securityapp-backend.vercel.app',
+        target: 'http://13.204.181.209',
         changeOrigin: true,
         secure: true,
       },
