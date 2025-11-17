@@ -13,9 +13,7 @@ const resolveBaseUrl = () => {
     return '/api';
   }
 
-  // Fallback: should not reach here if .env is properly configured
-  // This will only be used in SSR scenarios
-  throw new Error('VITE_API_BASE_URL is not configured. Please set it in your .env file.');
+  return 'https://securityapp-backend.vercel.app/api';
 };
 
 const BASE_URL = resolveBaseUrl();

@@ -97,9 +97,3 @@
 - Code: Updated src/utils/api.js to fallback to backend origin when /api proxy is absent.
 - Decisions: Use /api only on hosts with known rewrites (localhost, 127.*, *.vercel.app); others hit backend directly.
 - Next: Retest AWS login; configure VITE_API_BASE_URL if future environments need custom hosts.
-
-2025-01-20
-- Topics: Migrated all API URLs to use environment variables from .env file.
-- Code: Created .env and .env.example files with VITE_API_BASE_URL; updated src/utils/api.js to remove hardcoded backend URL and rely on environment variable; updated vite.config.js to use VITE_API_BASE_URL for dev proxy target.
-- Decisions: All API base URLs now come from .env file for easier deployment across different environments (local, AWS, Vercel, etc.); removed hardcoded fallback URL in api.js to enforce proper environment configuration; vite.config.js proxy now reads from env var.
-- Next: Set VITE_API_BASE_URL in deployment platform environment variables (Vercel dashboard, AWS, etc.) for production builds; note that vercel.json rewrite destination still needs manual update if backend URL changes (Vercel doesn't support env vars in JSON rewrites).
