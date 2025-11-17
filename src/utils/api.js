@@ -1,3 +1,14 @@
+const DEFAULT_BACKEND_BASE = 'https://securityapp-backend.vercel.app/api';
+
+const shouldUseSameOriginProxy = (hostname) => {
+  if (!hostname) return false;
+  return (
+    hostname === 'localhost' ||
+    hostname.startsWith('127.') ||
+    hostname.endsWith('.vercel.app')
+  );
+};
+
 const resolveBaseUrl = () => {
   try {
     const configured = typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL;
@@ -9,11 +20,13 @@ const resolveBaseUrl = () => {
   }
 
   if (typeof window !== 'undefined') {
-    // Always hit the same-origin proxy so hosted builds avoid CORS issues.
-    return '/api';
+    const hostname = window.location?.hostname || '';
+    if (shouldUseSameOriginProxy(hostname)) {
+      return '/api';
+    }
   }
 
-  return 'https://securityapp-backend.vercel.app/api';
+  return DEFAULT_BACKEND_BASE;
 };
 
 const BASE_URL = resolveBaseUrl();
