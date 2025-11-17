@@ -1,44 +1,18 @@
 const resolveBaseUrl = () => {
-  // Check if env variable is configured
-  let configuredUrl = null;
   try {
-    if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL) {
-      configuredUrl = import.meta.env.VITE_API_BASE_URL;
-      configuredUrl = configuredUrl.endsWith('/') ? configuredUrl.slice(0, -1) : configuredUrl;
+    const configured = typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL;
+    if (configured) {
+      return configured.endsWith('/') ? configured.slice(0, -1) : configured;
     }
   } catch (err) {
-    // noop - continue with fallback logic
+    // noop - fall back to defaults below
   }
 
-  // In browser environment
   if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    
-    // Use /api proxy for localhost (dev) and Vercel deployments (which have rewrite rules)
-    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.vercel.app')) {
-      return '/api';
-    }
-    
-    // For IP addresses or other hosts (AWS, etc.), use backend URL directly
-    // Check if hostname is an IP address (IPv4)
-    const isIPAddress = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname);
-    
-    // For IP addresses or non-localhost/non-Vercel hosts, use backend URL
-    if (isIPAddress || (hostname !== 'localhost' && hostname !== '127.0.0.1' && !hostname.endsWith('.vercel.app'))) {
-      // Use env variable if set, otherwise use default backend URL
-      return configuredUrl || 'https://securityapp-backend.vercel.app/api';
-    }
-    
-    // Fallback to /api for any other case (shouldn't reach here)
+    // Always hit the same-origin proxy so hosted builds avoid CORS issues.
     return '/api';
   }
 
-  // For SSR (server-side), use env variable or fallback
-  if (configuredUrl) {
-    return configuredUrl;
-  }
-
-  // Default fallback for SSR
   return 'https://securityapp-backend.vercel.app/api';
 };
 

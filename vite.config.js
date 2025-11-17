@@ -7,7 +7,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: process.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://http://13.204.181.209/',
+        target: 'https://securityapp-backend.vercel.app',
         changeOrigin: true,
         secure: true,
       },
