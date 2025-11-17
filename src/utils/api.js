@@ -14,22 +14,26 @@ const resolveBaseUrl = () => {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     
-    // Use /api proxy for localhost (dev) and Vercel deployments (which have rewrite rules)
-    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.vercel.app')) {
-      return '/api';
-    }
-    
-    // For IP addresses or other hosts (AWS, etc.), use backend URL directly
     // Check if hostname is an IP address (IPv4)
     const isIPAddress = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname);
     
-    // For IP addresses or non-localhost/non-Vercel hosts, use backend URL
-    if (isIPAddress || (hostname !== 'localhost' && hostname !== '127.0.0.1' && !hostname.endsWith('.vercel.app'))) {
-      // Use env variable if set, otherwise use default backend URL
-      return configuredUrl || 'https://securityapp-backend.vercel.app/api';
+    // Use /api proxy for:
+    // - localhost (dev with Vite proxy)
+    // - Vercel deployments (vercel.json rewrites)
+    // - IP addresses/AWS (nginx reverse proxy - see AWS_NGINX_SETUP.md)
+    // - Other hosts if env variable is NOT set (assumes proxy is configured)
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.vercel.app') || isIPAddress) {
+      return '/api';
     }
     
-    // Fallback to /api for any other case (shouldn't reach here)
+    // For other hosts with domain names, check if env variable is set
+    // If env variable is set, use it (direct backend connection)
+    // Otherwise use /api (assumes reverse proxy is configured)
+    if (configuredUrl) {
+      return configuredUrl;
+    }
+    
+    // Fallback to /api (requires reverse proxy configuration)
     return '/api';
   }
 
