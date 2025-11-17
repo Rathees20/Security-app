@@ -97,8 +97,3 @@
 - Code: Updated src/utils/api.js to fallback to backend origin when /api proxy is absent.
 - Decisions: Use /api only on hosts with known rewrites (localhost, 127.*, *.vercel.app); others hit backend directly.
 - Next: Retest AWS login; configure VITE_API_BASE_URL if future environments need custom hosts.
-2025-11-17 19:10
-- Topics: AWS login kept failing due to proxy-only base URL.
-- Code: Updated src/utils/api.js to detect runtime hostnames and fall back to backend origin when rewrites are absent.
-- Decisions: Use /api only on localhost, 127.*, or *.vercel.app; default to https://securityapp-backend.vercel.app/api elsewhere.
-- Next: Retest login on AWS deployment to confirm calls hit backend directly.
