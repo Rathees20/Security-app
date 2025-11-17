@@ -127,9 +127,3 @@
 - Code: Updated src/utils/api.js to detect AWS hosts and use VITE_API_BASE_URL for non-localhost/non-Vercel hosts; created DEPLOYMENT.md guide with instructions for Local, Vercel, and AWS deployments.
 - Decisions: Smart hostname detection (localhost/127.0.0.1/vercel.app use /api proxy; AWS/other hosts use VITE_API_BASE_URL from env); all pages (AdminControl, VisitHistory, SocietyControl, SignIn) use centralized API utility automatically benefiting from environment-aware configuration.
 - Next: Deploy to AWS and set VITE_API_BASE_URL environment variable in AWS deployment environment; verify all API calls work correctly.
-
-2025-11-17 19:15
-- Topics: Fixed AWS CORS issue by implementing nginx reverse proxy solution.
-- Code: Updated src/utils/api.js to use /api proxy for IP addresses (AWS) when nginx is configured; created nginx.conf.example and AWS_NGINX_SETUP.md with complete nginx reverse proxy configuration and setup instructions.
-- Decisions: For AWS deployments, use nginx reverse proxy to handle /api requests (similar to Vercel rewrites) to avoid CORS issues; IP addresses now use /api proxy which nginx forwards to backend; this eliminates need for backend CORS configuration for AWS domain.
-- Next: Set up nginx on AWS server following AWS_NGINX_SETUP.md guide, rebuild and redeploy app; verify login works without CORS errors.
