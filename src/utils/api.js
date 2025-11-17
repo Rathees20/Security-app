@@ -19,13 +19,17 @@ const resolveBaseUrl = () => {
       return '/api';
     }
     
-    // For other hosts (like AWS), use env variable if set, otherwise try /api
-    // If env variable is not set, fallback to /api (might need AWS proxy config)
-    if (configuredUrl) {
-      return configuredUrl;
+    // For IP addresses or other hosts (AWS, etc.), use backend URL directly
+    // Check if hostname is an IP address (IPv4)
+    const isIPAddress = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname);
+    
+    // For IP addresses or non-localhost/non-Vercel hosts, use backend URL
+    if (isIPAddress || (hostname !== 'localhost' && hostname !== '127.0.0.1' && !hostname.endsWith('.vercel.app'))) {
+      // Use env variable if set, otherwise use default backend URL
+      return configuredUrl || 'https://securityapp-backend.vercel.app/api';
     }
     
-    // Fallback to /api (requires proxy/rewrite configuration on the server)
+    // Fallback to /api for any other case (shouldn't reach here)
     return '/api';
   }
 
