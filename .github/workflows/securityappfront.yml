@@ -1,0 +1,43 @@
+name: Deploy React Frontend (Self Hosted)
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      # 1️⃣ Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2️⃣ Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      # 3️⃣ Install dependencies
+      - name: Install Dependencies
+        working-directory: ./frontend
+        run: |
+          rm -rf node_modules
+          npm install
+
+      # 4️⃣ Build the React App
+      - name: Build React App
+        working-directory: ./frontend
+        run: npm run build
+
+      # 5️⃣ Deploy to EC2 folder
+      - name: Deploy Build to EC2
+        run: |
+          sudo rm -rf /home/ec2-user/frontend
+          sudo mkdir -p /home/ec2-user/frontend
+          sudo cp -r frontend/dist/* /home/ec2-user/frontend
+
+      # 6️⃣ Restart Nginx (optional but recommended)
+      - name: Restart Nginx
+        run: sudo systemctl restart nginx
