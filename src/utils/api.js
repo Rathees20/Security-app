@@ -1,19 +1,29 @@
+const DEFAULT_BACKEND_URL = 'http://13.204.214.117/api';
+
+const normalizeUrl = (url) => (url.endsWith('/') ? url.slice(0, -1) : url);
+
+const shouldUseSameOriginProxy = () => {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname || '';
+  if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return true;
+  return host.endsWith('.vercel.app');
+};
+
 const resolveBaseUrl = () => {
+  if (shouldUseSameOriginProxy()) {
+    return '/api';
+  }
+
   try {
     const configured = typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL;
     if (configured) {
-      return configured.endsWith('/') ? configured.slice(0, -1) : configured;
+      return normalizeUrl(configured);
     }
   } catch (err) {
     // noop - fall back to defaults below
   }
 
-  if (typeof window !== 'undefined') {
-    // Always hit the same-origin proxy so hosted builds avoid CORS issues.
-    return '/api';
-  }
-
-  return 'https://securityapp-backend.vercel.app/api';
+  return DEFAULT_BACKEND_URL;
 };
 
 const BASE_URL = resolveBaseUrl();

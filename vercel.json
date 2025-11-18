@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://securityapp-backend.vercel.app/api/$1"
+      "destination": "http://13.204.214.117/api/$1"
     }
   ]
 }

@@ -115,3 +115,10 @@
 - Code: Updated src/components/Profile.jsx to read user data from localStorage (authUser) and display dynamic user information including login identifier, name, and generated initials. Updated src/components/SignIn.jsx to store the original login identifier along with user data.
 - Decisions: Profile component now displays the exact login identifier (email or phone) that was used during sign-in. Generate initials from user's name (first and last initial) or fallback to email/phone initials. Display user's name from user object (supports name, firstName/lastName, or firstName fields). Updated logout to also clear authUser from localStorage.
 - Next: Test profile display after login to verify login identifier appears correctly in the profile dropdown.
+2025-11-18 16:12
+- Topics: Pointed frontend API plumbing to AWS backend with env override.
+- Code: Updated src/utils/api.js, vite.config.js, vercel.json; added .env and .env.example defining VITE_API_BASE_URL.
+- Decisions: Default to AWS base URL unless VITE_API_BASE_URL overrides; keep /api proxy only for localhost/Vercel; dev proxy + rewrites now target AWS.
+- Next: Run login/building/admin flows in dev + hosted builds to confirm new backend works end-to-end.
+
+
