@@ -47,7 +47,12 @@ export default function SignIn() {
         window.localStorage.setItem('authToken', token)
       }
       if (response?.data?.user) {
-        window.localStorage.setItem('authUser', JSON.stringify(response.data.user))
+        // Store user data with the login identifier used
+        const userData = {
+          ...response.data.user,
+          loginIdentifier: rawIdentifier, // Store the original input (before normalization)
+        }
+        window.localStorage.setItem('authUser', JSON.stringify(userData))
       }
       navigate('/overview', { replace: true })
     } catch (err) {

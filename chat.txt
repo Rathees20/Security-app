@@ -87,13 +87,31 @@
 - Code: Updated src/utils/api.js to fallback to backend origin when /api proxy is absent.
 - Decisions: Use /api only on hosts with known rewrites (localhost, 127.*, *.vercel.app); others hit backend directly.
 - Next: Retest AWS login; configure VITE_API_BASE_URL if future environments need custom hosts.
+
+2025-11-18 10:29
+- Topics: Display login ID (email/phone) in profile dropdown.
+- Code: Updated src/components/Profile.jsx to read user data from localStorage (authUser) and display dynamic user information including login identifier, name, and generated initials. Updated src/components/SignIn.jsx to store the original login identifier along with user data.
+- Decisions: Profile component now displays the exact login identifier (email or phone) that was used during sign-in. Generate initials from user's name (first and last initial) or fallback to email/phone initials. Display user's name from user object (supports name, firstName/lastName, or firstName fields). Updated logout to also clear authUser from localStorage.
+- Next: Test profile display after login to verify login identifier appears correctly in the profile dropdown.
 2025-11-17 18:34
 - Topics: AWS login 405 investigation and fix.
 - Code: Updated src/utils/api.js to fallback to backend origin when /api proxy is absent.
 - Decisions: Use /api only on hosts with known rewrites (localhost, 127.*, *.vercel.app); others hit backend directly.
 - Next: Retest AWS login; configure VITE_API_BASE_URL if future environments need custom hosts.
+
+2025-11-18 10:29
+- Topics: Display login ID (email/phone) in profile dropdown.
+- Code: Updated src/components/Profile.jsx to read user data from localStorage (authUser) and display dynamic user information including login identifier, name, and generated initials. Updated src/components/SignIn.jsx to store the original login identifier along with user data.
+- Decisions: Profile component now displays the exact login identifier (email or phone) that was used during sign-in. Generate initials from user's name (first and last initial) or fallback to email/phone initials. Display user's name from user object (supports name, firstName/lastName, or firstName fields). Updated logout to also clear authUser from localStorage.
+- Next: Test profile display after login to verify login identifier appears correctly in the profile dropdown.
 2025-11-17 18:34
 - Topics: AWS login 405 investigation and fix.
 - Code: Updated src/utils/api.js to fallback to backend origin when /api proxy is absent.
 - Decisions: Use /api only on hosts with known rewrites (localhost, 127.*, *.vercel.app); others hit backend directly.
 - Next: Retest AWS login; configure VITE_API_BASE_URL if future environments need custom hosts.
+
+2025-11-18 10:29
+- Topics: Display login ID (email/phone) in profile dropdown.
+- Code: Updated src/components/Profile.jsx to read user data from localStorage (authUser) and display dynamic user information including login identifier, name, and generated initials. Updated src/components/SignIn.jsx to store the original login identifier along with user data.
+- Decisions: Profile component now displays the exact login identifier (email or phone) that was used during sign-in. Generate initials from user's name (first and last initial) or fallback to email/phone initials. Display user's name from user object (supports name, firstName/lastName, or firstName fields). Updated logout to also clear authUser from localStorage.
+- Next: Test profile display after login to verify login identifier appears correctly in the profile dropdown.

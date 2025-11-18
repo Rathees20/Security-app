@@ -1,14 +1,73 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 export default function Profile({ showName = true, size = 'default' }) {
   const [showDropdown, setShowDropdown] = useState(false)
   const navigate = useNavigate()
 
+  // Get user data from localStorage
+  const userData = useMemo(() => {
+    if (typeof window === 'undefined') return null
+    try {
+      const stored = window.localStorage.getItem('authUser')
+      return stored ? JSON.parse(stored) : null
+    } catch (err) {
+      console.error('Failed to parse user data', err)
+      return null
+    }
+  }, [])
+
+  // Generate initials from user data
+  const getInitials = () => {
+    if (!userData) return 'SC'
+    
+    // Try to get initials from name
+    if (userData.name) {
+      const nameParts = userData.name.trim().split(/\s+/)
+      if (nameParts.length >= 2) {
+        return (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase()
+      }
+      return nameParts[0][0].toUpperCase()
+    }
+    
+    // Fallback to email initials
+    if (userData.email) {
+      return userData.email.substring(0, 2).toUpperCase()
+    }
+    
+    // Fallback to phone initials
+    if (userData.phone) {
+      return userData.phone.substring(userData.phone.length - 2).toUpperCase()
+    }
+    
+    return 'SC'
+  }
+
+  // Get display name
+  const getDisplayName = () => {
+    if (userData?.name) return userData.name
+    if (userData?.firstName && userData?.lastName) {
+      return `${userData.firstName} ${userData.lastName}`
+    }
+    if (userData?.firstName) return userData.firstName
+    return 'User'
+  }
+
+  // Get login identifier (email or phone) - prioritize the stored loginIdentifier
+  const getLoginIdentifier = () => {
+    // First check if we have the exact login identifier that was used
+    if (userData?.loginIdentifier) return userData.loginIdentifier
+    // Fallback to email or phone from user object
+    if (userData?.email) return userData.email
+    if (userData?.phone) return userData.phone
+    return 'No identifier'
+  }
+
   const handleLogout = () => {
     // Clear any stored authentication data
     localStorage.removeItem('authToken')
     localStorage.removeItem('userData')
+    localStorage.removeItem('authUser')
     
     // Redirect to sign-in page
     navigate('/signin')
@@ -38,7 +97,7 @@ export default function Profile({ showName = true, size = 'default' }) {
         onClick={handleProfileClick}
         className={`${sizeClasses[size]} rounded-full bg-[#b00020] text-white font-bold hover:ring-2 hover:ring-[#b00020] hover:ring-offset-2 transition-all cursor-pointer flex items-center justify-center`}
       >
-        SC
+        {getInitials()}
       </button>
 
       {/* Profile Dropdown */}
@@ -56,11 +115,11 @@ export default function Profile({ showName = true, size = 'default' }) {
             <div className="px-4 py-3 border-b border-gray-100">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-[#b00020] text-white font-bold flex items-center justify-center text-sm">
-                  SC
+                  {getInitials()}
                 </div>
                 <div>
-                  <div className="text-sm font-medium text-gray-900">Admin User</div>
-                  <div className="text-xs text-gray-500">admin@securitycheck.com</div>
+                  <div className="text-sm font-medium text-gray-900">{getDisplayName()}</div>
+                  <div className="text-xs text-gray-500">{getLoginIdentifier()}</div>
                 </div>
               </div>
             </div>
