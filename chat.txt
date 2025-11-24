@@ -295,3 +295,9 @@
 - Decisions: Pagination arrows provide better UX for navigating through multiple admins; page indicator shows current position; arrows are disabled at boundaries to prevent invalid navigation; pagination controls only appear when needed (more than 4 admins); automatic reset ensures page stays valid when admin list changes.
 - Next: Test pagination arrows to verify navigation works correctly; confirm page indicator shows correct current/total pages; verify arrows disable properly at first/last page; test with different numbers of admins (less than 4, exactly 4, more than 4).
 
+2025-11-23 20:55
+- Topics: Added pagination controls to Upcoming Visitors section in OverviewCombined page and removed refresh button.
+- Code: Updated src/pages/OverviewCombined.jsx to: (1) introduce currentVisitorPage state, (2) reset visitor page to 0 whenever upcomingVisitors state changes within fetchUpcomingVisitors (all branches including error handling), (3) replace refresh icon in Upcoming Visitors header with left/right arrow controls plus page indicator when more than four visitors exist, (4) disable arrows at boundaries, (5) display visitors slice per page (4 cards) similar to admin pagination.
+- Decisions: Consistent pagination UX across admin and visitor sections; ensures users can browse all upcoming visitors without refresh; page resets prevent stale indices after refetch.
+- Next: Test Upcoming Visitors pagination to ensure navigation, page indicator, and disabled states work; verify behavior with fewer than four visitors and during loading/error states.
+

@@ -176,7 +176,6 @@ const normalizeVisits = (payload) =>
 
 export default function VisitHistory() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [showNotifications, setShowNotifications] = useState(false);
   const [selectedBuildingId, setSelectedBuildingId] = useState('all');
   const [buildings, setBuildings] = useState([]);
   const [visits, setVisits] = useState([]);
@@ -353,61 +352,12 @@ export default function VisitHistory() {
     );
   });
 
-  const notifications = [
-    { id: 1, message: "New visit logged for Building 1", time: "1 min ago", type: "info" },
-    { id: 2, message: "Visit approval pending", time: "5 min ago", type: "warning" },
-    { id: 3, message: "Security check completed", time: "15 min ago", type: "info" }
-  ];
-
   return (
     <div className="space-y-6 p-4 bg-white min-h-screen pt-16 lg:pt-4">
       {/* Header with Title, Notification, and Profile */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <h1 className="text-xl sm:text-2xl font-semibold text-gray-800">Visit History</h1>
         <div className="flex items-center gap-4">
-          <div className="relative">
-            <button 
-              onClick={() => setShowNotifications(!showNotifications)}
-              className="w-10 h-10 flex items-center justify-center rounded-full border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
-            >
-              <svg
-                className="w-5 h-5 text-gray-600"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-              </svg>
-            </button>
-            
-            {/* Notification Dropdown */}
-            {showNotifications && (
-              <div className="absolute right-0 top-12 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-lg shadow-lg border border-gray-200 z-50 sm:right-0 sm:left-auto left-0">
-                <div className="p-4 border-b border-gray-100">
-                  <h3 className="font-semibold text-gray-800">Notifications</h3>
-                </div>
-                <div className="max-h-64 overflow-y-auto">
-                  {notifications.map((notification) => (
-                    <div key={notification.id} className="p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer">
-                      <div className="flex items-start gap-3">
-                        <div className={`w-2 h-2 rounded-full mt-2 ${
-                          notification.type === 'warning' ? 'bg-red-500' : 'bg-blue-500'
-                        }`}></div>
-                        <div className="flex-1">
-                          <p className="text-sm text-gray-800">{notification.message}</p>
-                          <p className="text-xs text-gray-500 mt-1">{notification.time}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="p-3 border-t border-gray-100">
-                  <button className="w-full text-sm text-blue-600 hover:text-blue-800">
-                    View All Notifications
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
           <Profile />
         </div>
       </div>

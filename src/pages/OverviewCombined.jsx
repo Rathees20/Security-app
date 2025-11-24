@@ -472,6 +472,7 @@ function UpcomingVisitorCard({ visitor }) {
 
 function Dashboard() {
   const [upcomingVisitors, setUpcomingVisitors] = React.useState([])
+  const [currentVisitorPage, setCurrentVisitorPage] = React.useState(0)
   const [isLoadingVisitors, setIsLoadingVisitors] = React.useState(false)
   const [visitorsError, setVisitorsError] = React.useState('')
   const [userRole, setUserRole] = React.useState(null)
@@ -645,28 +646,33 @@ function Dashboard() {
 
         console.log('[OverviewCombined] Combined upcoming visitors from all buildings:', combinedVisitors.length)
         setUpcomingVisitors(combinedVisitors)
+        setCurrentVisitorPage(0)
       } else if (userBuildingId && userResidentId) {
         // For regular users, fetch from their building
         console.log('[OverviewCombined] Fetching upcoming visitors for user building:', userBuildingId)
         const response = await api.getUpcomingVisitors(userBuildingId, userResidentId)
         const normalized = normalizeUpcomingVisitors(response)
         setUpcomingVisitors(normalized)
+        setCurrentVisitorPage(0)
       } else {
         // Fallback to default
         console.log('[OverviewCombined] Using default building/resident IDs')
         const response = await api.getUpcomingVisitors(DEFAULT_BUILDING_ID, DEFAULT_RESIDENT_ID)
         const normalized = normalizeUpcomingVisitors(response)
         setUpcomingVisitors(normalized)
+        setCurrentVisitorPage(0)
       }
     } catch (err) {
       // Handle 404 as empty result instead of error
       if (err.status === 404) {
         console.log('[OverviewCombined] No upcoming visitors found')
         setUpcomingVisitors([])
+        setCurrentVisitorPage(0)
       } else {
         console.error('Failed to load upcoming visitors', err)
         setVisitorsError(err.message || 'Unable to load upcoming visitors')
         setUpcomingVisitors([])
+        setCurrentVisitorPage(0)
       }
     } finally {
       setIsLoadingVisitors(false)
@@ -760,22 +766,43 @@ function Dashboard() {
       <div>
         <div className="flex items-center justify-between mb-3">
           <div className="card-title">Upcoming Visitors</div>
-          <div className="flex gap-2">
-            <button
-              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-neutral-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={fetchUpcomingVisitors}
-              disabled={isLoadingVisitors}
-              title="Refresh upcoming visitors"
-            >
-              <svg className="w-4 h-4 text-neutral-600" fill="currentColor" viewBox="0 0 20 20">
-                <path
-                  fillRule="evenodd"
-                  d="M4 4a6 6 0 019.33-4.98 1 1 0 01-1.06 1.7A4 4 0 106 8h1.586a1 1 0 01.707 1.707l-3.293 3.293a1 1 0 01-1.414 0L.293 9.707A1 1 0 01 1 8h1a6 6 0 012-4zM16 12a4 4 0 00-4-4h-1.586a1 1 0 01-.707-1.707l3.293-3.293a1 1 0 011.414 0l3.293 3.293A1 1 0 0118 7h-1a6 6 0 11-9.33 4.98 1 1 0 011.06-1.7A4 4 0 1016 12z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </button>
-          </div>
+          {!isLoadingVisitors && upcomingVisitors.length > 4 && (
+            <div className="flex gap-2 items-center">
+              <button
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-neutral-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => setCurrentVisitorPage((prev) => Math.max(0, prev - 1))}
+                disabled={currentVisitorPage === 0}
+                title="Previous page"
+              >
+                <svg className="w-4 h-4 text-neutral-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path
+                    fillRule="evenodd"
+                    d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </button>
+              <span className="text-sm text-neutral-600 px-2">
+                {currentVisitorPage + 1} / {Math.ceil(upcomingVisitors.length / 4)}
+              </span>
+              <button
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-neutral-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() =>
+                  setCurrentVisitorPage((prev) => Math.min(Math.ceil(upcomingVisitors.length / 4) - 1, prev + 1))
+                }
+                disabled={currentVisitorPage >= Math.ceil(upcomingVisitors.length / 4) - 1}
+                title="Next page"
+              >
+                <svg className="w-4 h-4 text-neutral-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path
+                    fillRule="evenodd"
+                    d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
         {visitorsError && (
           <div className="mb-3 px-4 py-2 text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg">
@@ -788,13 +815,20 @@ function Dashboard() {
         {!isLoadingVisitors && !visitorsError && upcomingVisitors.length === 0 && (
           <div className="text-sm text-neutral-500">No upcoming visitors scheduled.</div>
         )}
-        {!isLoadingVisitors && upcomingVisitors.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            {upcomingVisitors.slice(0, 4).map((visitor) => (
-              <UpcomingVisitorCard key={visitor.id} visitor={visitor} />
-            ))}
-          </div>
-        )}
+        {!isLoadingVisitors && upcomingVisitors.length > 0 && (() => {
+          const itemsPerPage = 4
+          const startIndex = currentVisitorPage * itemsPerPage
+          const endIndex = startIndex + itemsPerPage
+          const currentVisitors = upcomingVisitors.slice(startIndex, endIndex)
+
+          return (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              {currentVisitors.map((visitor) => (
+                <UpcomingVisitorCard key={visitor.id} visitor={visitor} />
+              ))}
+            </div>
+          )
+        })()}
       </div>
     </div>
   )
