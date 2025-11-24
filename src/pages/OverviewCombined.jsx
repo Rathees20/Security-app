@@ -482,6 +482,7 @@ function Dashboard() {
   const [admins, setAdmins] = React.useState([])
   const [isLoadingAdmins, setIsLoadingAdmins] = React.useState(false)
   const [adminsError, setAdminsError] = React.useState('')
+  const [currentAdminPage, setCurrentAdminPage] = React.useState(0)
 
   // Get user information from localStorage
   React.useEffect(() => {
@@ -593,6 +594,7 @@ function Dashboard() {
       
       console.log('[OverviewCombined] Fetched admins:', normalized.length)
       setAdmins(normalized)
+      setCurrentAdminPage(0) // Reset to first page when admins are fetched
     } catch (err) {
       console.error('[OverviewCombined] Failed to fetch admins', err)
       setAdminsError(err.message || 'Unable to load admins')
@@ -603,10 +605,12 @@ function Dashboard() {
   }, [buildingsMap, userRole, userBuildingId])
 
   React.useEffect(() => {
-    if (buildingsMap && Object.keys(buildingsMap).length > 0) {
+    // Fetch admins automatically when user role is determined
+    // buildingsMap can be empty initially, but fetchAdmins can still work
+    if (userRole !== undefined) {
       fetchAdmins()
     }
-  }, [fetchAdmins, buildingsMap])
+  }, [fetchAdmins, userRole, buildingsMap])
 
   const fetchUpcomingVisitors = React.useCallback(async () => {
     setIsLoadingVisitors(true)
@@ -693,22 +697,33 @@ function Dashboard() {
       <div>
         <div className="flex items-center justify-between mb-3">
           <div className="card-title">Admins</div>
-          <div className="flex gap-2">
-            <button
-              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-neutral-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={fetchAdmins}
-              disabled={isLoadingAdmins}
-              title="Refresh admins"
-            >
-              <svg className="w-4 h-4 text-neutral-600" fill="currentColor" viewBox="0 0 20 20">
-                <path
-                  fillRule="evenodd"
-                  d="M4 4a6 6 0 019.33-4.98 1 1 0 01-1.06 1.7A4 4 0 106 8h1.586a1 1 0 01.707 1.707l-3.293 3.293a1 1 0 01-1.414 0L.293 9.707A1 1 0 01 1 8h1a6 6 0 012-4zM16 12a4 4 0 00-4-4h-1.586a1 1 0 01-.707-1.707l3.293-3.293a1 1 0 011.414 0l3.293 3.293A1 1 0 0118 7h-1a6 6 0 11-9.33 4.98 1 1 0 011.06-1.7A4 4 0 1016 12z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </button>
-          </div>
+          {!isLoadingAdmins && admins.length > 4 && (
+            <div className="flex gap-2 items-center">
+              <button
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-neutral-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => setCurrentAdminPage(prev => Math.max(0, prev - 1))}
+                disabled={currentAdminPage === 0}
+                title="Previous page"
+              >
+                <svg className="w-4 h-4 text-neutral-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </button>
+              <span className="text-sm text-neutral-600 px-2">
+                {currentAdminPage + 1} / {Math.ceil(admins.length / 4)}
+              </span>
+              <button
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-neutral-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => setCurrentAdminPage(prev => Math.min(Math.ceil(admins.length / 4) - 1, prev + 1))}
+                disabled={currentAdminPage >= Math.ceil(admins.length / 4) - 1}
+                title="Next page"
+              >
+                <svg className="w-4 h-4 text-neutral-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
         {adminsError && (
           <div className="mb-3 px-4 py-2 text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg">
@@ -721,19 +736,26 @@ function Dashboard() {
         {!isLoadingAdmins && !adminsError && admins.length === 0 && (
           <div className="text-sm text-neutral-500">No admins found.</div>
         )}
-        {!isLoadingAdmins && admins.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            {admins.slice(0, 4).map((admin) => (
-              <AdminCard
-                key={admin.id}
-                name={admin.name}
-                building={admin.building}
-                guards={admin.guards}
-                employees={admin.employees}
-              />
-            ))}
-          </div>
-        )}
+        {!isLoadingAdmins && admins.length > 0 && (() => {
+          const itemsPerPage = 4
+          const startIndex = currentAdminPage * itemsPerPage
+          const endIndex = startIndex + itemsPerPage
+          const currentAdmins = admins.slice(startIndex, endIndex)
+          
+          return (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              {currentAdmins.map((admin) => (
+                <AdminCard
+                  key={admin.id}
+                  name={admin.name}
+                  building={admin.building}
+                  guards={admin.guards}
+                  employees={admin.employees}
+                />
+              ))}
+            </div>
+          )
+        })()}
       </div>
       <div>
         <div className="flex items-center justify-between mb-3">
