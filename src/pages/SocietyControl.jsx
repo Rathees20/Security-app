@@ -1,7 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Profile from '../components/Profile';
 import { api } from '../utils/api';
 import filterIcon from '../assets/filter.png';
+
+const BUILDING_SORT_OPTIONS = [
+  { value: 'name-asc', label: 'Name · A → Z' },
+  { value: 'name-desc', label: 'Name · Z → A' },
+  { value: 'date-desc', label: 'Newest Added' },
+  { value: 'progress-desc', label: 'Most Visits Completed' },
+];
 
 const resolvePath = (object, path) =>
   path.split('.').reduce((acc, key) => (acc == null ? acc : acc[key]), object);
@@ -83,9 +90,7 @@ export default function SocietyControl() {
   const [submissionError, setSubmissionError] = useState('');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [allowLogin, setAllowLogin] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [showNotifications, setShowNotifications] = useState(false);
   const [formData, setFormData] = useState({
     buildingName: '',
     street: '',
@@ -97,9 +102,54 @@ export default function SocietyControl() {
     employees: '',
     image: null
   });
+  const [formErrors, setFormErrors] = useState({});
+  const [sortOption, setSortOption] = useState(BUILDING_SORT_OPTIONS[0].value);
+  const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
+  const sortMenuRef = useRef(null);
+  const selectedSortLabel = useMemo(
+    () => BUILDING_SORT_OPTIONS.find((option) => option.value === sortOption)?.label || 'Sort By',
+    [sortOption]
+  );
+
+  // Get current user information from localStorage
+  const [userBuildingId, setUserBuildingId] = useState(null);
+  const [userRole, setUserRole] = useState(null);
+
+  useEffect(() => {
+    const getUserInfo = () => {
+      try {
+        const userData = window.localStorage.getItem('authUser');
+        if (userData) {
+          const user = JSON.parse(userData);
+          const role = user?.role || user?.roleValue || '';
+          const buildingId = pickValue(user, [
+            'buildingId',
+            'building.id',
+            'building._id',
+            'buildingId',
+            'assignedBuilding',
+            'assignedBuildingId'
+          ]);
+          
+          setUserRole(role?.toLowerCase());
+          setUserBuildingId(buildingId);
+          console.log('[SocietyControl] Current user role:', role, 'buildingId:', buildingId);
+        }
+      } catch (err) {
+        console.error('[SocietyControl] Failed to get user info', err);
+      }
+    };
+    getUserInfo();
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    setFormErrors((prev) => {
+      if (!prev[name]) return prev;
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -120,18 +170,24 @@ export default function SocietyControl() {
     e.preventDefault();
     setSubmissionMessage('');
     setSubmissionError('');
+    setFormErrors({});
 
     const trimmedName = formData.buildingName.trim();
-    if (trimmedName.length < 2 || trimmedName.length > 100) {
-      setSubmissionError('Building name must be between 2 and 100 characters.');
-      return;
-    }
-
     const trimmedCity = formData.city.trim();
     const trimmedCountry = formData.country.trim() || 'India';
 
+    const nextErrors = {};
+
+    if (trimmedName.length < 2 || trimmedName.length > 100) {
+      nextErrors.buildingName = 'Building name must be between 2 and 100 characters.';
+    }
+
     if (trimmedCity && trimmedCity.length < 2) {
-      setSubmissionError('City must be at least 2 characters when provided.');
+      nextErrors.city = 'City must be at least 2 characters when provided.';
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setFormErrors(nextErrors);
       return;
     }
 
@@ -155,7 +211,6 @@ export default function SocietyControl() {
       });
       formPayload.append('securityGuards', formData.securityGuards);
       formPayload.append('employees', formData.employees);
-      formPayload.append('allowLogin', String(allowLogin));
       formPayload.append('image', formData.image);
       submissionPayload = formPayload;
     } else {
@@ -164,7 +219,6 @@ export default function SocietyControl() {
         address: addressPayload,
         securityGuards: formData.securityGuards,
         employees: formData.employees,
-        allowLogin,
       };
     }
 
@@ -185,7 +239,7 @@ export default function SocietyControl() {
           employees: '',
           image: null
         });
-        setAllowLogin(true);
+        setFormErrors({});
         await fetchBuildings();
       } catch (err) {
         console.error('Failed to create building', err);
@@ -203,14 +257,14 @@ export default function SocietyControl() {
     setBuildingError('');
     try {
       const response = await api.getBuildings();
-      const normalized = extractArray(response).map((item, index) => ({
+      let normalized = extractArray(response).map((item, index) => ({
         id: pickValue(item, ['_id', 'id', 'buildingId']) ?? `building-${index}`,
-      name:
-        toDisplayString(pickValue(item, ['name', 'buildingName', 'title']), 'Unnamed Building'),
-      location: toDisplayString(
-        pickValue(item, ['address', 'buildingAddress', 'location']),
-        'No address provided'
-      ),
+        name:
+          toDisplayString(pickValue(item, ['name', 'buildingName', 'title']), 'Unnamed Building'),
+        location: toDisplayString(
+          pickValue(item, ['address', 'buildingAddress', 'location']),
+          'No address provided'
+        ),
         progress:
           Number(
             pickValue(item, [
@@ -222,6 +276,23 @@ export default function SocietyControl() {
           ) || 0,
         date: formatDate(pickValue(item, ['createdAt', 'updatedAt', 'date'])),
       }));
+
+      // Filter buildings based on user's building if not super admin
+      if (userBuildingId && userRole !== 'super_admin' && userRole !== 'admin') {
+        console.log('[SocietyControl] Filtering buildings for user buildingId:', userBuildingId);
+        normalized = normalized.filter((building) => {
+          // Compare both as strings to handle different ID formats
+          const buildingIdStr = String(building.id);
+          const userBuildingIdStr = String(userBuildingId);
+          return buildingIdStr === userBuildingIdStr;
+        });
+        console.log('[SocietyControl] Filtered buildings count:', normalized.length);
+      } else if (userRole === 'super_admin' || userRole === 'admin') {
+        console.log('[SocietyControl] Super admin/admin - showing all buildings');
+      } else {
+        console.log('[SocietyControl] No buildingId found for user - showing all buildings');
+      }
+
       setBuildings(normalized);
     } catch (err) {
       console.error('Failed to fetch buildings', err);
@@ -233,20 +304,53 @@ export default function SocietyControl() {
   };
 
   useEffect(() => {
-    fetchBuildings();
+    // Wait for user info to be loaded before fetching buildings
+    if (userRole !== undefined) {
+      fetchBuildings();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userRole, userBuildingId]);
+
+  useEffect(() => {
+    const handleClickAway = (event) => {
+      if (!sortMenuRef.current) return;
+      if (!sortMenuRef.current.contains(event.target)) {
+        setIsSortMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickAway);
+    return () => document.removeEventListener('mousedown', handleClickAway);
   }, []);
 
-  const filteredBuildings = buildings.filter(building =>
-    building.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    building.location.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredBuildings = useMemo(() => {
+    const query = searchTerm.toLowerCase();
+    if (!query) return buildings;
+    return buildings.filter(
+      (building) =>
+        building.name.toLowerCase().includes(query) ||
+        building.location.toLowerCase().includes(query)
+    );
+  }, [buildings, searchTerm]);
 
-  const notifications = [
-    { id: 1, message: "New building registration request", time: "3 min ago", type: "info" },
-    { id: 2, message: "Security update for Building 1", time: "10 min ago", type: "info" },
-    { id: 3, message: "Maintenance alert in Building 2", time: "30 min ago", type: "warning" }
-  ];
+  const sortedBuildings = useMemo(() => {
+    const list = [...filteredBuildings];
+    const toTimestamp = (value) => {
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+    };
+    switch (sortOption) {
+      case 'name-desc':
+        return list.sort((a, b) => b.name.localeCompare(a.name));
+      case 'date-desc':
+        return list.sort((a, b) => toTimestamp(b.date) - toTimestamp(a.date));
+      case 'progress-desc':
+        return list.sort((a, b) => (b.progress || 0) - (a.progress || 0));
+      case 'name-asc':
+      default:
+        return list.sort((a, b) => a.name.localeCompare(b.name));
+    }
+  }, [filteredBuildings, sortOption]);
 
   return (
     <div className="space-y-6 sm:space-y-8 p-4 sm:p-6 bg-white min-h-screen pt-16 lg:pt-4">
@@ -258,49 +362,6 @@ export default function SocietyControl() {
         
         {/* User/Notification Icons - Far Right */}
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <button 
-              onClick={() => setShowNotifications(!showNotifications)}
-              className="w-10 h-10 flex items-center justify-center rounded-full border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
-            >
-              <svg
-                className="w-5 h-5 text-gray-600"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-              </svg>
-            </button>
-            
-            {/* Notification Dropdown */}
-            {showNotifications && (
-              <div className="absolute right-0 top-12 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-lg shadow-lg border border-gray-200 z-50 sm:right-0 sm:left-auto left-0">
-                <div className="p-4 border-b border-gray-100">
-                  <h3 className="font-semibold text-gray-800">Notifications</h3>
-                </div>
-                <div className="max-h-64 overflow-y-auto">
-                  {notifications.map((notification) => (
-                    <div key={notification.id} className="p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer">
-                      <div className="flex items-start gap-3">
-                        <div className={`w-2 h-2 rounded-full mt-2 ${
-                          notification.type === 'warning' ? 'bg-red-500' : 'bg-blue-500'
-                        }`}></div>
-                        <div className="flex-1">
-                          <p className="text-sm text-gray-800">{notification.message}</p>
-                          <p className="text-xs text-gray-500 mt-1">{notification.time}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="p-3 border-t border-gray-100">
-                  <button className="w-full text-sm text-blue-600 hover:text-blue-800">
-                    View All Notifications
-          </button>
-                </div>
-              </div>
-            )}
-          </div>
           <Profile />
         </div>
       </div>
@@ -322,21 +383,66 @@ export default function SocietyControl() {
         </div>
         
         {/* Sort Button */}
-        <button className="flex items-center gap-2 px-4 py-3 border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors justify-center">
-          <img src={filterIcon} alt="Filter list" className="w-4 h-4 object-contain" />
-          <span className="text-sm text-neutral-800">Sort By: A to Z</span>
-        </button>
+        <div className="relative" ref={sortMenuRef}>
+          <button
+            type="button"
+            onClick={() => setIsSortMenuOpen((prev) => !prev)}
+            className="flex items-center gap-2 px-4 py-3 border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors justify-center text-sm text-neutral-800"
+          >
+            <img src={filterIcon} alt="Filter buildings" className="w-4 h-4 object-contain" />
+            {selectedSortLabel}
+            <svg
+              className={`w-4 h-4 text-neutral-500 transition-transform ${isSortMenuOpen ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {isSortMenuOpen && (
+            <div className="absolute right-0 mt-2 w-60 bg-white border border-neutral-200 rounded-lg shadow-lg z-20 p-2">
+              <p className="text-xs uppercase tracking-wide text-neutral-500 px-2 mb-1">Sort buildings</p>
+              <div className="space-y-1">
+                {BUILDING_SORT_OPTIONS.map((option) => (
+                  <label
+                    key={option.value}
+                    className={`flex items-center gap-2 px-2 py-2 rounded-md cursor-pointer text-sm ${
+                      sortOption === option.value
+                        ? 'bg-neutral-100 text-neutral-900 font-medium'
+                        : 'text-neutral-600 hover:bg-neutral-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="building-sort"
+                      className="text-[#B00020] focus:ring-[#B00020]"
+                      checked={sortOption === option.value}
+                      onChange={() => {
+                        setSortOption(option.value);
+                        setIsSortMenuOpen(false);
+                      }}
+                    />
+                    {option.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
         
-        {/* Add New Building Button */}
-        <button
-          className="flex items-center gap-2 px-4 py-3 bg-[#B00020] text-white rounded-lg hover:bg-red-700 transition-colors justify-center"
-          onClick={() => setIsModalOpen(true)}
-        >
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-          </svg>
-          <span className="text-sm">Add New Building</span>
-        </button>
+        {/* Add New Building Button - Only show for super admin/admin */}
+        {(userRole === 'super_admin' || userRole === 'admin' || !userRole) && (
+          <button
+            className="flex items-center gap-2 px-4 py-3 bg-[#B00020] text-white rounded-lg hover:bg-red-700 transition-colors justify-center"
+            onClick={() => setIsModalOpen(true)}
+          >
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+            </svg>
+            <span className="text-sm">Add New Building</span>
+          </button>
+        )}
       </div>
 
       {/* All Buildings Section */}
@@ -352,12 +458,6 @@ export default function SocietyControl() {
             {submissionMessage}
           </div>
         )}
-        {submissionError && (
-          <div className="mb-4 px-4 py-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg">
-            {submissionError}
-          </div>
-        )}
-        
         {/* Building Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {isLoadingBuildings && (
@@ -365,13 +465,13 @@ export default function SocietyControl() {
               Loading buildings...
             </div>
           )}
-          {!isLoadingBuildings && filteredBuildings.length === 0 && (
+          {!isLoadingBuildings && sortedBuildings.length === 0 && (
             <div className="col-span-full text-center text-sm text-neutral-500 py-6">
               No buildings found.
             </div>
           )}
           {!isLoadingBuildings &&
-            filteredBuildings.map((building) => (
+            sortedBuildings.map((building) => (
               <div key={building.id} className="bg-white rounded-xl shadow-sm border border-neutral-200 p-5 hover:shadow-md transition-shadow">
               {/* Building Image Placeholder */}
               <div className="h-28 bg-neutral-200 rounded-lg flex items-center justify-center text-neutral-500 mb-4">
@@ -423,6 +523,11 @@ export default function SocietyControl() {
               </svg>
             </button>
             <h2 className="text-lg font-semibold text-neutral-900 mb-4">Add Building</h2>
+            {submissionError && (
+              <div className="mb-4 px-3 py-2 text-sm text-red-700 bg-red-50 border border-red-100 rounded-md">
+                {submissionError}
+              </div>
+            )}
             
             {/* Add Image */}
             <div className="mb-4">
@@ -456,6 +561,9 @@ export default function SocietyControl() {
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B00020] focus:border-transparent text-sm"
               />
+              {formErrors.buildingName && (
+                <p className="mt-1 text-xs text-red-600">{formErrors.buildingName}</p>
+              )}
             </div>
 
             {/* Street */}
@@ -480,6 +588,9 @@ export default function SocietyControl() {
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B00020] focus:border-transparent text-sm"
               />
+              {formErrors.city && (
+                <p className="mt-1 text-xs text-red-600">{formErrors.city}</p>
+              )}
             </div>
 
             {/* State */}
@@ -540,33 +651,6 @@ export default function SocietyControl() {
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B00020] focus:border-transparent text-sm"
               />
-            </div>
-            
-            {/* Allow Admin to Log In */}
-            <div className="mb-4">
-              <div className="flex items-center justify-between text-sm text-neutral-700">
-                <span>Allow the admin to log in to the app</span>
-                <div className="relative">
-                  <input 
-                    type="checkbox" 
-                    className="sr-only" 
-                    checked={allowLogin}
-                    onChange={(e) => setAllowLogin(e.target.checked)}
-                  />
-                  <div 
-                    className={`w-8 h-4 rounded-full shadow-inner transition-colors duration-200 ease-in-out cursor-pointer ${
-                      allowLogin ? 'bg-[#B00020]' : 'bg-gray-200'
-                    }`}
-                    onClick={() => setAllowLogin(!allowLogin)}
-                  >
-                    <div 
-                      className={`w-3 h-3 bg-white rounded-full shadow transform transition-transform duration-200 ease-in-out ${
-                        allowLogin ? 'translate-x-4 translate-y-0.5' : 'translate-x-0.5 translate-y-0.5'
-                      }`}
-                    ></div>
-                  </div>
-                </div>
-              </div>
             </div>
             
             {/* Add Admin Button */}

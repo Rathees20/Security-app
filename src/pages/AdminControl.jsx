@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Profile from '../components/Profile';
 import { api } from '../utils/api';
 import filterIcon from '../assets/filter.png';
@@ -64,6 +64,31 @@ const toDisplayString = (value, fallback = '') => {
   return fallback;
 };
 
+const formatRoleForDisplay = (roleValue) => {
+  if (!roleValue || typeof roleValue !== 'string') return 'ADMIN';
+  const trimmed = roleValue.trim();
+  if (!trimmed) return 'ADMIN';
+  
+  const normalized = trimmed.toLowerCase().replace(/[_\s]+/g, '_');
+  
+  // Map building_admin to Building Admin for display - handle all variations
+  if (normalized === 'building_admin' || normalized === 'buildingadmin' || 
+      (trimmed.toLowerCase().includes('building') && trimmed.toLowerCase().includes('admin'))) {
+    return 'Building Admin';
+  }
+  
+  // Also handle legacy super_admin for backward compatibility
+  if (normalized === 'super_admin' || normalized === 'superadmin' || 
+      (trimmed.toLowerCase().includes('super') && trimmed.toLowerCase().includes('admin'))) {
+    return 'Building Admin';
+  }
+  
+  // Format other roles with proper capitalization
+  return trimmed
+    .replace(/[_\s]+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
 const extractArray = (payload, visited = new WeakSet()) => {
   if (!payload || visited.has(payload)) return [];
   if (Array.isArray(payload)) return payload;
@@ -97,13 +122,48 @@ const extractArray = (payload, visited = new WeakSet()) => {
 
 const DEFAULT_ROLE_OPTIONS = [
   { value: 'admin', label: 'Admin' },
-  { value: 'super_admin', label: 'Super Admin' },
+  { value: 'building_admin', label: 'Building Admin' },
+  { value: 'security', label: 'Security' },
+  { value: 'resident', label: 'Resident' },
 ];
+
+const RESTRICTED_ROLE_KEYS = ['security', 'resident', 'building_admin'];
+const isRestrictedRole = (value = '') => RESTRICTED_ROLE_KEYS.includes(value.toLowerCase());
+
+const MODAL_TITLES = {
+  default: 'Admin',
+  security: 'Security',
+  resident: 'Resident',
+  building_admin: 'Building Admin',
+};
+
+const SORT_OPTIONS = [
+  { value: 'name-asc', label: 'Name · A → Z' },
+  { value: 'name-desc', label: 'Name · Z → A' },
+  { value: 'role-asc', label: 'Role · A → Z' },
+  { value: 'guards-desc', label: 'Most Security Guards' },
+  { value: 'employees-desc', label: 'Most Employees' },
+];
+
+const createInitialFormData = (roleValue = DEFAULT_ROLE_OPTIONS[0].value) => ({
+  name: "",
+  email: "",
+  password: "",
+  confirmPassword: "",
+  role: roleValue,
+  buildingId: "",
+  employeeCode: "",
+  buildingName: "",
+  buildingAddress: "",
+  phoneNumber: "",
+  securityGuards: "",
+  employees: "",
+});
 
 export default function AdminControl() {
   const [showModal, setShowModal] = useState(false);
+  const [modalContext, setModalContext] = useState('default');
   const [searchTerm, setSearchTerm] = useState("");
-  const [showNotifications, setShowNotifications] = useState(false);
   const [admins, setAdmins] = useState([]);
   const [isLoadingAdmins, setIsLoadingAdmins] = useState(false);
   const [adminsError, setAdminsError] = useState('');
@@ -111,30 +171,75 @@ export default function AdminControl() {
   const [submissionError, setSubmissionError] = useState('');
   const [submissionMessage, setSubmissionMessage] = useState('');
 
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-    role: DEFAULT_ROLE_OPTIONS[0].value,
-    buildingId: "",
-    employeeCode: "",
-    buildingName: "",
-    buildingAddress: "",
-    phoneNumber: "",
-    securityGuards: "",
-    employees: "",
-    allowLogin: true,
-  });
+  const [formData, setFormData] = useState(() => createInitialFormData(DEFAULT_ROLE_OPTIONS[0].value));
   const [buildingOptions, setBuildingOptions] = useState([]);
   const [isLoadingBuildingOptions, setIsLoadingBuildingOptions] = useState(false);
   const [buildingOptionsError, setBuildingOptionsError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [sortOption, setSortOption] = useState(SORT_OPTIONS[0].value);
+  const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
+  const sortMenuRef = useRef(null);
+  const selectedSortLabel = useMemo(
+    () => SORT_OPTIONS.find((option) => option.value === sortOption)?.label || 'Sort',
+    [sortOption]
+  );
+
+  const PHONE_REGEX = /^\d{10}$/;
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
+    let nextValue = type === "checkbox" ? checked : value;
+
+    setFieldErrors((prev) => {
+      if (!prev[name]) return prev;
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
+
+    if (name === 'phoneNumber') {
+      const digitsOnly = typeof nextValue === 'string' ? nextValue.replace(/\D/g, '') : '';
+      nextValue = digitsOnly;
+      const candidate = digitsOnly;
+      if (!candidate) {
+        setPhoneError('');
+      } else if (!PHONE_REGEX.test(candidate)) {
+        setPhoneError('Phone number must be exactly 10 digits.');
+      } else {
+        setPhoneError('');
+      }
+    }
+
+
+    // Auto-fill building address when building is selected
+    if (name === 'buildingId') {
+      if (nextValue) {
+        const selectedBuilding = buildingOptions.find(
+          (building) => building.id === nextValue
+        );
+        
+        setFormData((prev) => ({
+          ...prev,
+          [name]: nextValue,
+          buildingName: selectedBuilding?.name || '',
+          buildingAddress: selectedBuilding?.address || '',
+        }));
+      } else {
+        // Clear building-related fields when building is deselected
+        setFormData((prev) => ({
+          ...prev,
+          [name]: '',
+          buildingName: '',
+          buildingAddress: '',
+        }));
+      }
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : value,
+      [name]: nextValue,
     }));
   };
 
@@ -166,6 +271,7 @@ export default function AdminControl() {
             'numSecurityGuards',
           ]);
 
+        const rawRole = pickValue(item, ['role']);
         return {
           id: pickValue(item, ['_id', 'id', 'userId']) ?? `admin-${index}`,
           name: toDisplayString(
@@ -183,7 +289,8 @@ export default function AdminControl() {
           ),
           employees: toDisplayString(employeeCount, '0'),
           securityGuards: toDisplayString(securityGuardCount, '0'),
-          role: toDisplayString(pickValue(item, ['role']), 'ADMIN'),
+          role: formatRoleForDisplay(rawRole),
+          roleValue: rawRole, // Store original backend value for dropdown options
           details:
             toDisplayString(pickValue(item, ['details', 'description'])) ||
             `Email: ${toDisplayString(pickValue(item, ['email']), 'N/A')} · Phone: ${toDisplayString(
@@ -210,18 +317,31 @@ export default function AdminControl() {
     const seen = new Map();
 
     admins.forEach((admin) => {
-      const roleValue = admin?.role;
+      // Use roleValue (original backend value) if available, otherwise use role (formatted)
+      const roleValue = admin?.roleValue || admin?.role;
       if (!roleValue || typeof roleValue !== 'string') return;
       const trimmed = roleValue.trim();
       if (!trimmed || seen.has(trimmed)) return;
 
-      const prettyLabel = trimmed
-        .replace(/[_\s]+/g, ' ')
-        .replace(/\b\w/g, (char) => char.toUpperCase());
+      // Custom label for building_admin to display as "Building Admin" - handle all variations
+      const normalized = trimmed.toLowerCase().replace(/[_\s]+/g, '_');
+      let label;
+      if (normalized === 'building_admin' || normalized === 'buildingadmin' || 
+          (trimmed.toLowerCase().includes('building') && trimmed.toLowerCase().includes('admin'))) {
+        label = 'Building Admin';
+      } else if (normalized === 'super_admin' || normalized === 'superadmin' || 
+          (trimmed.toLowerCase().includes('super') && trimmed.toLowerCase().includes('admin'))) {
+        // Handle legacy super_admin for backward compatibility
+        label = 'Building Admin';
+      } else {
+        label = trimmed
+          .replace(/[_\s]+/g, ' ')
+          .replace(/\b\w/g, (char) => char.toUpperCase());
+      }
 
       seen.set(trimmed, {
         value: trimmed,
-        label: prettyLabel || trimmed,
+        label: label || trimmed,
       });
     });
 
@@ -232,26 +352,122 @@ export default function AdminControl() {
     return DEFAULT_ROLE_OPTIONS;
   }, [admins]);
 
+  const defaultRoleOptions = useMemo(() => {
+    const filtered = availableRoles.filter(
+      (option) => option?.value && !isRestrictedRole(option.value)
+    );
+    if (filtered.length) {
+      return filtered;
+    }
+    return DEFAULT_ROLE_OPTIONS.filter((option) => !isRestrictedRole(option.value));
+  }, [availableRoles]);
+
   useEffect(() => {
-    if (!showModal || !availableRoles.length) {
+    const handleClickAway = (event) => {
+      if (!sortMenuRef.current) return;
+      if (!sortMenuRef.current.contains(event.target)) {
+        setIsSortMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickAway);
+    return () => document.removeEventListener('mousedown', handleClickAway);
+  }, []);
+
+  useEffect(() => {
+    if (!showModal) {
       return;
     }
 
     setFormData((prev) => {
-      const hasValidRole = availableRoles.some((option) => option.value === prev.role);
-      if (hasValidRole) {
+      const normalizedRole = prev.role?.toLowerCase() || '';
+      const roleInAvailable = availableRoles.some((option) => option.value === prev.role);
+      const roleIsRestricted = isRestrictedRole(normalizedRole);
+
+      if (roleIsRestricted || roleInAvailable) {
         return prev;
       }
+
+      const fallbackPool =
+        modalContext === 'default' ? defaultRoleOptions : availableRoles;
+      const fallbackRole = fallbackPool[0]?.value;
+
+      if (!fallbackRole || fallbackRole === prev.role) {
+        return prev;
+      }
+
       return {
         ...prev,
-        role: availableRoles[0].value,
+        role: fallbackRole,
       };
     });
-  }, [availableRoles, showModal]);
+  }, [availableRoles, defaultRoleOptions, modalContext, showModal]);
 
   const requiresSecurityFields = useMemo(
-    () => formData.role?.toLowerCase() === 'security',
-    [formData.role]
+    () => modalContext === 'security' && formData.role?.toLowerCase() === 'security',
+    [modalContext, formData.role]
+  );
+
+  const requiresBuildingAdminFields = useMemo(
+    () => modalContext === 'building_admin' || formData.role?.toLowerCase() === 'building_admin',
+    [modalContext, formData.role]
+  );
+
+  const getRoleForContext = useCallback(
+    (roleKey) => {
+      if (roleKey) {
+        const normalized = roleKey.toLowerCase();
+        return (
+          availableRoles.find((option) => option.value?.toLowerCase() === normalized)?.value ||
+          roleKey
+        );
+      }
+
+      return (
+        defaultRoleOptions[0]?.value ||
+        DEFAULT_ROLE_OPTIONS.find((option) => !isRestrictedRole(option.value))?.value ||
+        DEFAULT_ROLE_OPTIONS[0].value
+      );
+    },
+    [availableRoles, defaultRoleOptions]
+  );
+
+  const handleOpenModalForRole = useCallback(
+    (roleKey) => {
+      const normalizedKey = (roleKey || '').toLowerCase();
+      let nextRole;
+      let modalCtx = 'default';
+
+      if (roleKey) {
+        const isSecurity = normalizedKey === 'security';
+        const isResident = normalizedKey === 'resident';
+        const isBuildingAdmin = normalizedKey === 'building_admin' || normalizedKey === 'super_admin' || normalizedKey === 'building admin';
+        
+        if (isSecurity) {
+          modalCtx = 'security';
+          nextRole = 'security';
+        } else if (isResident) {
+          modalCtx = 'resident';
+          nextRole = 'resident';
+        } else if (isBuildingAdmin) {
+          modalCtx = 'building_admin';
+          nextRole = 'building_admin'; // Use building_admin as separate role
+        } else {
+          nextRole = getRoleForContext(roleKey);
+        }
+      } else {
+        nextRole = getRoleForContext(roleKey);
+      }
+
+      setFormData(createInitialFormData(nextRole));
+      setModalContext(modalCtx);
+      setPhoneError('');
+      setFieldErrors({});
+      setSubmissionError('');
+      setSubmissionMessage('');
+      setShowModal(true);
+    },
+    [getRoleForContext]
   );
 
   const fetchBuildingOptions = useCallback(async () => {
@@ -281,56 +497,76 @@ export default function AdminControl() {
   }, []);
 
   useEffect(() => {
-    if (!showModal || !requiresSecurityFields) {
+    if (!showModal) {
       return;
     }
     fetchBuildingOptions();
-  }, [fetchBuildingOptions, requiresSecurityFields, showModal]);
+  }, [fetchBuildingOptions, showModal]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setSubmissionError('');
     setSubmissionMessage('');
+    setFieldErrors({});
 
     const trimmedEmail = formData.email.trim();
     const name = formData.name.trim();
     const role = formData.role?.trim();
+    const phoneNumber = formData.phoneNumber.trim();
+
+    const nextFieldErrors = {};
 
     if (!name) {
-      setSubmissionError('Name is required.');
-      return;
+      nextFieldErrors.name = 'Name is required.';
     }
 
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!trimmedEmail || !emailPattern.test(trimmedEmail)) {
-      setSubmissionError('Please enter a valid email address.');
-      return;
+    if (!trimmedEmail) {
+      nextFieldErrors.email = 'Email is required.';
+    } else if (!emailPattern.test(trimmedEmail)) {
+      nextFieldErrors.email = 'Please enter a valid email address.';
     }
 
-    if (!formData.password || formData.password.length < 6) {
-      setSubmissionError('Password must be at least 6 characters long.');
-      return;
+    if (!formData.password) {
+      nextFieldErrors.password = 'Password is required.';
+    } else if (formData.password.length < 6) {
+      nextFieldErrors.password = 'Password must be at least 6 characters long.';
     }
 
-    if (formData.password !== formData.confirmPassword) {
-      setSubmissionError('Passwords must match.');
-      return;
+    if (!formData.confirmPassword) {
+      nextFieldErrors.confirmPassword = 'Please confirm the password.';
+    } else if (formData.password !== formData.confirmPassword) {
+      nextFieldErrors.confirmPassword = 'Passwords must match.';
     }
 
     if (!role) {
-      setSubmissionError('Please select a role.');
-      return;
+      nextFieldErrors.role = 'Please select a role.';
+    }
+
+    if (!phoneNumber) {
+      nextFieldErrors.phoneNumber = 'Phone number is required.';
+    } else if (phoneError || !PHONE_REGEX.test(phoneNumber)) {
+      nextFieldErrors.phoneNumber = phoneError || 'Phone number must be exactly 10 digits.';
     }
 
     if (requiresSecurityFields) {
       if (!formData.buildingId) {
-        setSubmissionError('Please select a building for security personnel.');
-        return;
+        nextFieldErrors.buildingId = 'Please select a building.';
       }
       if (!formData.employeeCode.trim()) {
-        setSubmissionError('Employee code is required for security personnel.');
-        return;
+        nextFieldErrors.employeeCode = 'Employee code is required.';
       }
+    }
+
+    if (requiresBuildingAdminFields) {
+      if (!formData.buildingId) {
+        nextFieldErrors.buildingId = 'Please select a building.';
+      }
+    }
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors);
+      return;
     }
 
     const payload = {
@@ -339,44 +575,64 @@ export default function AdminControl() {
       password: formData.password,
       confirmPassword: formData.confirmPassword,
       role,
-      buildingName: formData.buildingName,
-      buildingAddress: formData.buildingAddress,
-      phoneNumber: formData.phoneNumber,
-      securityGuards: formData.securityGuards,
-      employees: formData.employees,
-      allowLogin: formData.allowLogin,
+      phoneNumber,
     };
 
-    if (requiresSecurityFields) {
-      payload.buildingId = formData.buildingId;
+    // Only include fields that have values to avoid empty string validation errors
+    if (formData.buildingId && formData.buildingId.trim()) {
+      payload.buildingId = formData.buildingId.trim();
+    }
+    
+    if (formData.buildingName && formData.buildingName.trim()) {
+      payload.buildingName = formData.buildingName.trim();
+    }
+    
+    if (formData.buildingAddress && formData.buildingAddress.trim()) {
+      payload.buildingAddress = formData.buildingAddress.trim();
+    }
+    
+    // Convert to numbers if they have values
+    if (formData.securityGuards !== '' && formData.securityGuards !== null && formData.securityGuards !== undefined) {
+      const guardsNum = Number(formData.securityGuards);
+      if (!isNaN(guardsNum) && guardsNum >= 0) {
+        payload.securityGuards = guardsNum;
+      }
+    }
+    
+    if (formData.employees !== '' && formData.employees !== null && formData.employees !== undefined) {
+      const employeesNum = Number(formData.employees);
+      if (!isNaN(employeesNum) && employeesNum >= 0) {
+        payload.employees = employeesNum;
+      }
+    }
+
+    if (requiresSecurityFields && formData.employeeCode && formData.employeeCode.trim()) {
       payload.employeeCode = formData.employeeCode.trim();
     }
 
     const submitAdmin = async () => {
       setIsSubmitting(true);
       try {
-        await api.createAdmin(payload);
+        console.log('Submitting admin payload:', payload);
+        const response = await api.createAdmin(payload);
+        console.log('Admin created successfully:', response);
         setSubmissionMessage('Admin created successfully.');
         setShowModal(false);
-        setFormData({
-          name: "",
-          email: "",
-          password: "",
-          confirmPassword: "",
-          role: availableRoles[0]?.value || DEFAULT_ROLE_OPTIONS[0].value,
-          buildingId: "",
-          employeeCode: "",
-          buildingName: "",
-          buildingAddress: "",
-          phoneNumber: "",
-          securityGuards: "",
-          employees: "",
-          allowLogin: true,
-        });
+        setModalContext('default');
+        setFormData(createInitialFormData(availableRoles[0]?.value || DEFAULT_ROLE_OPTIONS[0].value));
+        setPhoneError('');
         await fetchAdmins();
       } catch (err) {
         console.error('Failed to create admin', err);
-        setSubmissionError(err.message || 'Unable to create admin');
+        console.error('Error details:', err.message, err);
+        console.error('Payload sent:', payload);
+        console.error('Response status:', err.status, err.statusText);
+        
+        // Use the error message which should already contain formatted validation errors
+        const errorMessage = err.message || 'Unable to create admin';
+        
+        // Show error in UI
+        setSubmissionError(errorMessage);
       } finally {
         setIsSubmitting(false);
       }
@@ -385,17 +641,38 @@ export default function AdminControl() {
     submitAdmin();
   };
 
-  const filteredAdmins = admins.filter(admin =>
-    admin.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    admin.building.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    admin.details.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredAdmins = useMemo(() => {
+    const query = searchTerm.toLowerCase();
+    if (!query) return admins;
+    return admins.filter((admin) =>
+      admin.name.toLowerCase().includes(query) ||
+      admin.building.toLowerCase().includes(query) ||
+      admin.details.toLowerCase().includes(query)
+    );
+  }, [admins, searchTerm]);
 
-  const notifications = [
-    { id: 1, message: "New admin registration request", time: "2 min ago", type: "info" },
-    { id: 2, message: "Security alert in Building 1", time: "5 min ago", type: "warning" },
-    { id: 3, message: "System maintenance scheduled", time: "1 hour ago", type: "info" }
-  ];
+  const sortedAdmins = useMemo(() => {
+    const items = [...filteredAdmins];
+    const coerceNumber = (value) => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+    switch (sortOption) {
+      case 'name-desc':
+        return items.sort((a, b) => b.name.localeCompare(a.name));
+      case 'role-asc':
+        return items.sort((a, b) => a.role.localeCompare(b.role));
+      case 'guards-desc':
+        return items.sort((a, b) => coerceNumber(b.securityGuards) - coerceNumber(a.securityGuards));
+      case 'employees-desc':
+        return items.sort((a, b) => coerceNumber(b.employees) - coerceNumber(a.employees));
+      case 'name-asc':
+      default:
+        return items.sort((a, b) => a.name.localeCompare(b.name));
+    }
+  }, [filteredAdmins, sortOption]);
+
+  const resolvedPhoneError = phoneError || fieldErrors.phoneNumber;
 
   return (
     <div className="px-4 sm:px-6 lg:px-10 bg-white min-h-screen pt-16 lg:pt-4">
@@ -407,52 +684,6 @@ export default function AdminControl() {
 
         {/* Right side icons */}
         <div className="flex items-center gap-5">
-          {/* Notification */}
-          <div className="relative">
-            <button 
-              onClick={() => setShowNotifications(!showNotifications)}
-              className="w-10 h-10 flex items-center justify-center rounded-full border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
-            >
-              <svg
-                className="w-5 h-5 text-gray-600"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-              </svg>
-            </button>
-            
-            {/* Notification Dropdown */}
-            {showNotifications && (
-              <div className="absolute right-0 top-12 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-lg shadow-lg border border-gray-200 z-50 sm:right-0 sm:left-auto left-0">
-                <div className="p-4 border-b border-gray-100">
-                  <h3 className="font-semibold text-gray-800">Notifications</h3>
-                </div>
-                <div className="max-h-64 overflow-y-auto">
-                  {notifications.map((notification) => (
-                    <div key={notification.id} className="p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer">
-                      <div className="flex items-start gap-3">
-                        <div className={`w-2 h-2 rounded-full mt-2 ${
-                          notification.type === 'warning' ? 'bg-red-500' : 'bg-blue-500'
-                        }`}></div>
-                        <div className="flex-1">
-                          <p className="text-sm text-gray-800">{notification.message}</p>
-                          <p className="text-xs text-gray-500 mt-1">{notification.time}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="p-3 border-t border-gray-100">
-                  <button className="w-full text-sm text-blue-600 hover:text-blue-800">
-                    View All Notifications
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Profile */}
           <Profile />
         </div>
       </div>
@@ -485,15 +716,55 @@ export default function AdminControl() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
         <h2 className="text-lg font-semibold text-neutral-900">All Admins</h2>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-          <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 hover:bg-gray-50 transition justify-center">
-            <img src={filterIcon} alt="Filter list" className="w-4 h-4 object-contain" />
-            Sort By: A to Z
-          </button>
-
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <div className="flex-1 min-w-[150px] relative" ref={sortMenuRef}>
+            <button
+              type="button"
+              onClick={() => setIsSortMenuOpen((prev) => !prev)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 font-medium hover:bg-gray-50 transition"
+            >
+              <img src={filterIcon} alt="Sort admins" className="w-4 h-4 object-contain" />
+              {selectedSortLabel}
+              <svg
+                className={`w-4 h-4 text-gray-500 transition-transform ${isSortMenuOpen ? 'rotate-180' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {isSortMenuOpen && (
+              <div className="absolute right-0 mt-2 w-60 bg-white border border-gray-200 rounded-lg shadow-lg z-10 p-2">
+                <p className="text-xs uppercase tracking-wide text-gray-500 px-2 mb-1">Sort admins</p>
+                <div className="space-y-1">
+                  {SORT_OPTIONS.map((option) => (
+                    <label
+                      key={option.value}
+                      className={`flex items-center gap-2 px-2 py-2 rounded-md cursor-pointer text-sm ${
+                        sortOption === option.value ? 'bg-gray-100 text-gray-900 font-medium' : 'text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="admin-sort"
+                        checked={sortOption === option.value}
+                        onChange={() => {
+                          setSortOption(option.value);
+                          setIsSortMenuOpen(false);
+                        }}
+                        className="text-[#b00020] focus:ring-[#b00020]"
+                      />
+                      {option.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
           <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-4 py-2 border border-[#b00020] rounded-lg text-sm text-[#b00020] font-medium hover:bg-[#b00020]/10 transition justify-center"
+            onClick={() => handleOpenModalForRole('resident')}
+            className="flex-1 min-w-[150px] flex items-center gap-2 px-4 py-2 border border-[#b00020] rounded-lg text-sm text-[#b00020] font-medium hover:bg-[#b00020]/10 transition justify-center"
           >
             <svg
               className="w-3.5 h-3.5 text-[#b00020]"
@@ -506,7 +777,41 @@ export default function AdminControl() {
                 clipRule="evenodd"
               />
             </svg>
-            Add New Admin
+            Add Resident
+          </button>
+          <button
+            onClick={() => handleOpenModalForRole('security')}
+            className="flex-1 min-w-[150px] flex items-center gap-2 px-4 py-2 border border-[#b00020] rounded-lg text-sm text-[#b00020] font-medium hover:bg-[#b00020]/10 transition justify-center"
+          >
+            <svg
+              className="w-3.5 h-3.5 text-[#b00020]"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path
+                fillRule="evenodd"
+                d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                clipRule="evenodd"
+              />
+            </svg>
+            Add Security
+          </button>
+          <button
+            onClick={() => handleOpenModalForRole('building_admin')}
+            className="flex-1 min-w-[150px] flex items-center gap-2 px-4 py-2 border border-[#b00020] rounded-lg text-sm text-[#b00020] font-medium hover:bg-[#b00020]/10 transition justify-center"
+          >
+            <svg
+              className="w-3.5 h-3.5 text-[#b00020]"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path
+                fillRule="evenodd"
+                d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                clipRule="evenodd"
+              />
+            </svg>
+            Add Building Admin
           </button>
         </div>
       </div>
@@ -523,12 +828,6 @@ export default function AdminControl() {
         </div>
       )}
 
-      {submissionError && (
-        <div className="mb-6 px-4 py-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg">
-          {submissionError}
-        </div>
-      )}
-
       {/* Admin cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {isLoadingAdmins && (
@@ -536,12 +835,12 @@ export default function AdminControl() {
             Loading admins...
           </div>
         )}
-        {!isLoadingAdmins && filteredAdmins.length === 0 && (
+        {!isLoadingAdmins && sortedAdmins.length === 0 && (
           <div className="col-span-full text-center text-sm text-gray-500 py-6">
             No admins found.
           </div>
         )}
-        {!isLoadingAdmins && filteredAdmins.map((admin) => (
+        {!isLoadingAdmins && sortedAdmins.map((admin) => (
           <div
             key={admin.id}
             className="p-4 rounded-lg border border-[#b00020] bg-white shadow-sm hover:shadow-md transition"
@@ -618,10 +917,15 @@ export default function AdminControl() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                   </svg>
                 </button>
-                <h3 className="font-semibold text-lg text-gray-800">Admin</h3>
+                <h3 className="font-semibold text-lg text-gray-800">
+                  {MODAL_TITLES[modalContext] || 'Admin'}
+                </h3>
               </div>
               <button
-                onClick={() => setShowModal(false)}
+                onClick={() => {
+                  setShowModal(false);
+                  setModalContext('default');
+                }}
                 className="text-gray-400 hover:text-gray-600"
               >
                 ✕
@@ -629,6 +933,11 @@ export default function AdminControl() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              {submissionError && (
+                <div className="px-3 py-2 text-sm text-red-700 bg-red-50 border border-red-100 rounded-md">
+                  {submissionError}
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
                 <input
@@ -639,6 +948,9 @@ export default function AdminControl() {
                   placeholder="Enter email"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#b00020]"
                 />
+                {fieldErrors.email && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.email}</p>
+                )}
               </div>
 
               <div>
@@ -651,6 +963,9 @@ export default function AdminControl() {
                   placeholder="Enter password"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#b00020]"
                 />
+                {fieldErrors.password && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.password}</p>
+                )}
               </div>
 
               <div>
@@ -663,6 +978,9 @@ export default function AdminControl() {
                   placeholder="Re-enter password"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#b00020]"
                 />
+                {fieldErrors.confirmPassword && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.confirmPassword}</p>
+                )}
               </div>
 
               <div>
@@ -674,17 +992,34 @@ export default function AdminControl() {
                   placeholder="Enter name"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#b00020]"
                 />
+                {fieldErrors.name && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.name}</p>
+                )}
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Building Name</label>
-                <input
-                  name="buildingName"
-                  value={formData.buildingName}
+                <label className="block text-xs font-medium text-gray-700 mb-1">Assign Building</label>
+                <select
+                  name="buildingId"
+                  value={formData.buildingId}
                   onChange={handleInputChange}
-                  placeholder="Enter building name"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#b00020]"
-                />
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#b00020] bg-white"
+                  disabled={isLoadingBuildingOptions}
+                >
+                  <option value="">{isLoadingBuildingOptions ? 'Loading buildings...' : 'Select building'}</option>
+                  {buildingOptions.map((building) => (
+                    <option key={building.id} value={building.id}>
+                      {building.name}
+                      {building.address ? ` · ${building.address}` : ''}
+                    </option>
+                  ))}
+                </select>
+                {buildingOptionsError && (
+                  <p className="mt-1 text-xs text-red-600">{buildingOptionsError}</p>
+                )}
+                {fieldErrors.buildingId && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.buildingId}</p>
+                )}
               </div>
 
               <div>
@@ -703,11 +1038,20 @@ export default function AdminControl() {
                 <input
                   name="phoneNumber"
                   type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  maxLength={10}
                   value={formData.phoneNumber}
                   onChange={handleInputChange}
                   placeholder="Enter phone number"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#b00020]"
+                  aria-invalid={Boolean(phoneError)}
+                  className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 ${
+                    resolvedPhoneError ? 'border-red-400 focus:ring-red-500' : 'border-gray-300 focus:ring-[#b00020]'
+                  }`}
                 />
+                {resolvedPhoneError && (
+                  <p className="mt-1 text-xs text-red-600">{resolvedPhoneError}</p>
+                )}
               </div>
 
               <div>
@@ -734,46 +1078,36 @@ export default function AdminControl() {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Role</label>
-                <select
-                  name="role"
-                  value={formData.role}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#b00020] bg-white"
-                >
-                  {availableRoles.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {modalContext === 'default' ? (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Role</label>
+                  <select
+                    name="role"
+                    value={formData.role}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#b00020] bg-white"
+                  >
+                    {defaultRoleOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  {fieldErrors.role && (
+                    <p className="mt-1 text-xs text-red-600">{fieldErrors.role}</p>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Role</label>
+                  <div className="px-3 py-2 border border-gray-200 rounded-md text-sm bg-gray-50 text-gray-800">
+                    {MODAL_TITLES[modalContext]}
+                  </div>
+                </div>
+              )}
 
               {requiresSecurityFields && (
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Assign Building</label>
-                    <select
-                      name="buildingId"
-                      value={formData.buildingId}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#b00020] bg-white"
-                      disabled={isLoadingBuildingOptions}
-                    >
-                      <option value="">{isLoadingBuildingOptions ? 'Loading buildings...' : 'Select building'}</option>
-                      {buildingOptions.map((building) => (
-                        <option key={building.id} value={building.id}>
-                          {building.name}
-                          {building.address ? ` · ${building.address}` : ''}
-                        </option>
-                      ))}
-                    </select>
-                    {buildingOptionsError && (
-                      <p className="mt-1 text-xs text-red-600">{buildingOptionsError}</p>
-                    )}
-                  </div>
-
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Employee Code</label>
                     <input
@@ -783,38 +1117,12 @@ export default function AdminControl() {
                       placeholder="Enter employee code"
                       className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#b00020]"
                     />
+                    {fieldErrors.employeeCode && (
+                      <p className="mt-1 text-xs text-red-600">{fieldErrors.employeeCode}</p>
+                    )}
                   </div>
                 </div>
               )}
-
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-xs text-gray-700">Allow the admin to login to the app</span>
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    name="allowLogin"
-                    className="sr-only"
-                    checked={formData.allowLogin}
-                    onChange={handleInputChange}
-                  />
-                  <div
-                    onClick={() =>
-                      setFormData((p) => ({ ...p, allowLogin: !p.allowLogin }))
-                    }
-                    className={`w-8 h-4 rounded-full shadow-inner transition-colors duration-200 ease-in-out cursor-pointer ${
-                      formData.allowLogin ? "bg-[#b00020]" : "bg-gray-200"
-                    }`}
-                  >
-                    <div
-                      className={`w-3 h-3 bg-white rounded-full shadow transform transition-transform duration-200 ease-in-out ${
-                        formData.allowLogin
-                          ? "translate-x-4 translate-y-0.5"
-                          : "translate-x-0.5 translate-y-0.5"
-                      }`}
-                    ></div>
-                  </div>
-                </div>
-              </div>
 
               <div className="pt-2">
                 <button
@@ -822,7 +1130,15 @@ export default function AdminControl() {
                   className="w-full py-2.5 bg-[#b00020] text-white rounded-md text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
                   disabled={isSubmitting}
                 >
-                  {isSubmitting ? 'Adding...' : 'Add Admin'}
+                  {isSubmitting 
+                    ? 'Adding...' 
+                    : modalContext === 'building_admin' 
+                      ? 'Add Building Admin' 
+                      : modalContext === 'security' 
+                        ? 'Add Security' 
+                        : modalContext === 'resident' 
+                          ? 'Add Resident' 
+                          : 'Submit'}
                 </button>
               </div>
             </form>

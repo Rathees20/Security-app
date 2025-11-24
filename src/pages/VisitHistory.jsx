@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Profile from '../components/Profile';
 import { api } from '../utils/api';
+import filterIcon from '../assets/filter.png';
 
 const resolvePath = (object, path) =>
   path.split('.').reduce((acc, key) => (acc == null ? acc : acc[key]), object);
@@ -49,28 +50,48 @@ const extractArray = (payload, visited = new WeakSet()) => {
 
   visited.add(payload);
 
+  // Check the most specific paths first based on actual API response structure
   const candidates = [
+    // Most specific: data.visits (from API response: { success: true, data: { visits: [...] } })
+    payload?.data?.visits,
+    // Direct array properties
     payload.data,
     payload.results,
     payload.items,
     payload.visits,
     payload.buildings,
-    payload?.data?.visits,
+    // Nested data structures
     payload?.data?.items,
     payload?.data?.results,
     payload?.data?.buildings,
     payload?.data?.data,
     payload?.data?.docs,
+    // Additional possible response structures
+    payload?.visits?.data,
+    payload?.visits?.items,
+    payload?.visits?.results,
   ];
 
   for (const candidate of candidates) {
-    if (Array.isArray(candidate)) return candidate;
+    if (Array.isArray(candidate)) {
+      console.log('[VisitHistory] Found array in payload at:', candidate.length, 'items');
+      return candidate;
+    }
     if (candidate && typeof candidate === 'object') {
       const nested = extractArray(candidate, visited);
-      if (nested.length) return nested;
+      if (nested.length) {
+        console.log('[VisitHistory] Found array in nested structure:', nested.length, 'items');
+        return nested;
+      }
     }
   }
 
+  console.warn('[VisitHistory] extractArray: No array found in payload structure:', {
+    keys: Object.keys(payload || {}),
+    hasData: !!payload?.data,
+    dataKeys: payload?.data ? Object.keys(payload.data) : [],
+    fullPayload: payload
+  });
   return [];
 };
 
@@ -88,74 +109,166 @@ const normalizeBuildings = (payload) =>
   });
 
 const normalizeVisits = (payload) =>
-  extractArray(payload).map((item, index) => ({
-    id: pickValue(item, ['_id', 'id', 'visitId']) ?? `visit-${index}`,
-    name:
-      toDisplayString(
-        pickValue(item, ['visitorName', 'name', 'visitor.fullName', 'visitor.name']),
-        'Unknown Visitor'
-      ),
-    buildingName: toDisplayString(
-      pickValue(item, ['buildingName', 'building.name', 'building']),
-      'Unknown Building'
-    ),
-    approvedBy: toDisplayString(
+  extractArray(payload).map((item, index) => {
+    // Extract visitor name from visitorId object
+    const visitorId = item?.visitorId || {};
+    const visitorName = pickValue(visitorId, [
+      'name',
+      'fullContactInfo.name',
+      'fullName',
+    ]) || pickValue(item, ['visitorName', 'name']);
+    
+    // Extract approved by from approvedBy object
+    const approvedByObj = item?.approvedBy || {};
+    const approvedByName = pickValue(approvedByObj, [
+      'name',
+      'fullName',
+    ]) || pickValue(item, [
+      'approvedByName',
+      'securityPersonnel',
+      'verifiedBySecurity.name',
+      'guardName',
+    ]);
+    
+    // Extract building name (might not be in visit object, so use buildingId as fallback)
+    const buildingName = toDisplayString(
       pickValue(item, [
-        'approvedBy',
-        'approvedByName',
-        'securityPersonnel',
-        'security.name',
-        'guardName',
+        'buildingName',
+        'building.name',
+        'building',
+      ]) || pickValue(item, ['buildingId']),
+      'Building'
+    );
+    
+    // Extract remarks/purpose
+    const remarks = toDisplayString(
+      pickValue(item, [
+        'purpose',
+        'remarks',
+        'reason',
+        'note',
       ]),
-      'Not available'
-    ),
-    remarks: toDisplayString(
-      pickValue(item, ['remarks', 'purpose', 'reason', 'note']),
       'No remarks provided'
-    ),
-    dateTime: formatDateTime(
-      pickValue(item, ['dateTime', 'visitTime', 'createdAt', 'updatedAt', 'timestamp'])
-    ),
-  }));
+    );
+    
+    // Extract date/time (prefer createdAt for visit history)
+    const dateTime = formatDateTime(
+      pickValue(item, [
+        'createdAt',
+        'updatedAt',
+        'checkInTime',
+        'approvedAt',
+        'dateTime',
+        'visitTime',
+        'timestamp',
+      ])
+    );
+
+    return {
+      id: pickValue(item, ['_id', 'id', 'visitId']) ?? `visit-${index}`,
+      name: toDisplayString(visitorName, 'Unknown Visitor'),
+      buildingName,
+      approvedBy: toDisplayString(approvedByName, 'Not available'),
+      remarks,
+      dateTime,
+    };
+  });
 
 export default function VisitHistory() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showNotifications, setShowNotifications] = useState(false);
+  const [selectedBuildingId, setSelectedBuildingId] = useState('all');
   const [buildings, setBuildings] = useState([]);
-  const [selectedBuildingId, setSelectedBuildingId] = useState('');
   const [visits, setVisits] = useState([]);
-  const [isLoadingBuildings, setIsLoadingBuildings] = useState(false);
   const [isLoadingVisits, setIsLoadingVisits] = useState(false);
   const [error, setError] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+  const filterMenuRef = useRef(null);
+  
+  // Get current user role from localStorage
+  const [userRole, setUserRole] = useState(null);
+  
+  useEffect(() => {
+    const getUserRole = () => {
+      try {
+        const userData = window.localStorage.getItem('authUser');
+        if (userData) {
+          const user = JSON.parse(userData);
+          const role = user?.role || user?.roleValue || '';
+          setUserRole(role?.toLowerCase());
+          console.log('[VisitHistory] Current user role:', role);
+        }
+      } catch (err) {
+        console.error('[VisitHistory] Failed to get user role', err);
+      }
+    };
+    getUserRole();
+  }, []);
 
   useEffect(() => {
     const fetchBuildings = async () => {
-      setIsLoadingBuildings(true);
       setError('');
       try {
+        console.log('[VisitHistory] Fetching buildings...');
         const response = await api.getBuildings();
+        console.log('[VisitHistory] Buildings API response:', response);
         const normalized = normalizeBuildings(response);
+        console.log('[VisitHistory] Normalized buildings:', normalized);
         setBuildings(normalized);
-        if (!selectedBuildingId && normalized.length > 0) {
-          const firstWithId = normalized.find((building) => building.id);
-          if (firstWithId?.id) {
-            setSelectedBuildingId(firstWithId.id);
+        
+        // For super admin, default to 'all', otherwise select first building
+        if (normalized.length > 0) {
+          if (userRole === 'super_admin' || userRole === 'admin') {
+            // Super admin can see all buildings, default to 'all'
+            if (selectedBuildingId === 'all' || !selectedBuildingId) {
+              setSelectedBuildingId('all');
+            }
+          } else {
+            // For other roles, select first building
+            if (!selectedBuildingId || selectedBuildingId === 'all') {
+              const firstWithId = normalized.find((building) => building.id);
+              if (firstWithId?.id) {
+                console.log('[VisitHistory] Setting selectedBuildingId to:', firstWithId.id);
+                setSelectedBuildingId(firstWithId.id);
+              }
+            }
           }
+        } else {
+          console.warn('[VisitHistory] No buildings found');
+          setError('No buildings available. Please create a building first.');
         }
       } catch (err) {
-        console.error('Failed to fetch buildings', err);
+        console.error('[VisitHistory] Failed to fetch buildings', err);
         setError(err.message || 'Unable to load buildings');
-      } finally {
-        setIsLoadingBuildings(false);
       }
     };
 
     fetchBuildings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [userRole]);
+
+  // Handle clicking outside filter menu to close it
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!filterMenuRef.current) return;
+      if (!filterMenuRef.current.contains(event.target)) {
+        setIsFilterMenuOpen(false);
+      }
+    };
+
+    if (isFilterMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isFilterMenuOpen]);
 
   useEffect(() => {
-    if (!selectedBuildingId) {
+    if (!selectedBuildingId || selectedBuildingId === 'all' && buildings.length === 0) {
       return;
     }
 
@@ -163,11 +276,61 @@ export default function VisitHistory() {
       setIsLoadingVisits(true);
       setError('');
       try {
-        const response = await api.getTodayVisits(selectedBuildingId);
-        const normalized = normalizeVisits(response);
-        setVisits(normalized);
+        // If 'all' is selected and user is super admin, fetch visits for all buildings
+        if (selectedBuildingId === 'all' && (userRole === 'super_admin' || userRole === 'admin')) {
+          console.log('[VisitHistory] Fetching visits for ALL buildings');
+          const allVisitsPromises = buildings.map((building) =>
+            api.getVisitHistory(building.id, 100, startDate || null, endDate || null)
+              .then((response) => normalizeVisits(response))
+              .catch((err) => {
+                console.warn(`[VisitHistory] Failed to fetch visits for building ${building.id}:`, err);
+                return []; // Return empty array for failed requests
+              })
+          );
+
+          const allVisitsArrays = await Promise.all(allVisitsPromises);
+          const combinedVisits = allVisitsArrays.flat();
+          
+          // Sort by date (most recent first)
+          combinedVisits.sort((a, b) => {
+            const dateA = new Date(a.dateTime);
+            const dateB = new Date(b.dateTime);
+            return dateB - dateA;
+          });
+
+          console.log('[VisitHistory] Combined visits from all buildings:', combinedVisits.length);
+          setVisits(combinedVisits);
+          
+          if (combinedVisits.length === 0) {
+            console.warn('[VisitHistory] No visits found across all buildings');
+          }
+        } else {
+          // Fetch visits for specific building
+          console.log('[VisitHistory] Fetching visits for buildingId:', selectedBuildingId, 'limit: 100', 'startDate:', startDate, 'endDate:', endDate);
+          const response = await api.getVisitHistory(
+            selectedBuildingId, 
+            100, 
+            startDate || null, 
+            endDate || null
+          );
+          console.log('[VisitHistory] API response:', response);
+          const normalized = normalizeVisits(response);
+          console.log('[VisitHistory] Normalized visits:', normalized);
+          setVisits(normalized);
+          
+          if (normalized.length === 0) {
+            console.warn('[VisitHistory] No visits found after normalization. Raw response:', response);
+          }
+        }
       } catch (err) {
-        console.error('Failed to fetch visits', err);
+        console.error('[VisitHistory] Failed to fetch visits', err);
+        console.error('[VisitHistory] Error details:', {
+          message: err.message,
+          status: err.status,
+          statusText: err.statusText,
+          url: err.url,
+          responseData: err.responseData
+        });
         setError(err.message || 'Unable to load visits');
         setVisits([]);
       } finally {
@@ -176,7 +339,7 @@ export default function VisitHistory() {
     };
 
     fetchVisits();
-  }, [selectedBuildingId]);
+  }, [selectedBuildingId, startDate, endDate, buildings, userRole]);
 
   const filteredVisits = visits.filter((visit) => {
     const query = searchTerm.trim().toLowerCase();
@@ -249,7 +412,7 @@ export default function VisitHistory() {
         </div>
       </div>
 
-      {/* Search and Sort Section */}
+      {/* Search and Filter Section */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="relative w-full max-w-md">
           <input
@@ -273,24 +436,63 @@ export default function VisitHistory() {
             />
           </svg>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-          <select
-            value={selectedBuildingId}
-            onChange={(event) => setSelectedBuildingId(event.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 focus:border-transparent text-sm"
-            disabled={isLoadingBuildings || buildings.length === 0}
+        
+        {/* Filter Button with Date Dropdown */}
+        <div className="relative" ref={filterMenuRef}>
+          <button
+            type="button"
+            onClick={() => setIsFilterMenuOpen((prev) => !prev)}
+            className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm text-gray-800 font-medium"
           >
-            {isLoadingBuildings && <option>Loading buildings...</option>}
-            {!isLoadingBuildings && buildings.length === 0 && (
-              <option value="">No buildings available</option>
-            )}
-            {!isLoadingBuildings &&
-              buildings.map((building) => (
-                <option key={building.id} value={building.id}>
-                  {building.name}
-                </option>
-              ))}
-          </select>
+            <img src={filterIcon} alt="Filter visits" className="w-4 h-4 object-contain" />
+            {startDate || endDate ? 'Date Filter' : 'Filter'}
+            <svg
+              className={`w-4 h-4 text-gray-500 transition-transform ${isFilterMenuOpen ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          
+          {isFilterMenuOpen && (
+            <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-20 p-4">
+              <p className="text-xs uppercase tracking-wide text-gray-500 mb-3">Filter by Date</p>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1 font-medium">From Date</label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 focus:border-transparent text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1 font-medium">To Date</label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-700 focus:border-transparent text-sm"
+                  />
+                </div>
+                {(startDate || endDate) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStartDate('');
+                      setEndDate('');
+                    }}
+                    className="w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 border border-red-200 rounded-lg transition-colors"
+                  >
+                    Clear Filters
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -320,10 +522,21 @@ export default function VisitHistory() {
                   </td>
                 </tr>
               )}
-              {!isLoadingVisits && filteredVisits.length === 0 && (
+              {!isLoadingVisits && (!selectedBuildingId || (selectedBuildingId === 'all' && buildings.length === 0)) && (
                 <tr>
                   <td colSpan={5} className="px-3 sm:px-6 py-6 text-center text-sm text-gray-500">
-                    No visit history found for the selected building.
+                    {buildings.length === 0 
+                      ? 'Loading building information...'
+                      : 'Loading visits...'}
+                  </td>
+                </tr>
+              )}
+              {!isLoadingVisits && selectedBuildingId && filteredVisits.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-3 sm:px-6 py-6 text-center text-sm text-gray-500">
+                    {startDate || endDate 
+                      ? 'No visit history found for the selected date range.'
+                      : 'No visit history found.'}
                   </td>
                 </tr>
               )}

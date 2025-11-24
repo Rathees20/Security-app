@@ -121,4 +121,165 @@
 - Decisions: Default to AWS base URL unless VITE_API_BASE_URL overrides; keep /api proxy only for localhost/Vercel; dev proxy + rewrites now target AWS.
 - Next: Run login/building/admin flows in dev + hosted builds to confirm new backend works end-to-end.
 
+2025-11-19 15:27
+- Topics: Added dedicated Resident/Security entry buttons and role-locked modal flow in AdminControl.
+- Code: Updated src/pages/AdminControl.jsx with modal context state, role-specific button handlers, dynamic modal titles, locked role display for resident/security modes, and reset logic.
+- Decisions: Keep role selection editable only when using the generic Add Admin button; reuse existing security-only validation while hiding the dropdown for resident/security flows.
+- Next: Manually test adding resident and security profiles to ensure correct fields show and payloads submit as expected.
+
+2025-11-19 15:34
+- Topics: Restricted generic Add Admin modal to admin-only roles and ensured security-only fields appear solely via the Security button.
+- Code: Updated src/pages/AdminControl.jsx to introduce restricted-role helpers, filter dropdown options for the default modal, tighten `handleOpenModalForRole`, and gate security field rendering on modal context.
+- Decisions: Prevent resident/security submissions from the generic button to minimize confusion; keep dedicated buttons responsible for their specialized payloads.
+- Next: Verify each button path (Admin, Resident, Security) to confirm the correct fields and payloads are applied.
+
+2025-11-19 15:37
+- Topics: Removed the “Allow the admin to login to the app” toggle from AdminControl.
+- Code: Cleaned `formData` defaults, submission payload, and modal markup in src/pages/AdminControl.jsx so the allowLogin flag is no longer editable or submitted.
+- Decisions: Rely on backend defaults for login permission; reduce modal clutter by dropping unused switches.
+- Next: Retest admin creation to ensure backend accepts payload without `allowLogin`.
+
+2025-11-19 15:39
+- Topics: Standardized All Admins header buttons to share equal sizing.
+- Code: Updated src/pages/AdminControl.jsx header controls so Sort, Add Resident, Add Security, and Add Admin share the same flex sizing, padding, and minimum width classes.
+- Decisions: Keep color accents per role while maintaining consistent dimensions for visual balance.
+- Next: Verify responsive breakpoints to ensure buttons align uniformly on mobile and desktop.
+
+2025-11-19 15:41
+- Topics: Added plus icons to Resident and Security buttons to match Admin control.
+- Code: Updated src/pages/AdminControl.jsx to prepend the same plus SVG to both buttons, using neutral/red colors that align with their borders.
+- Decisions: Keep iconography consistent across all action buttons for better affordance without changing existing behavior.
+- Next: Confirm the icons align centered on various screen sizes.
+
+2025-11-19 15:45
+- Topics: Updated Add Resident button styling to match Security/Admin color treatment.
+- Code: src/pages/AdminControl.jsx now uses the red border/text scheme for the resident button with matching plus icon color.
+- Decisions: Keep all “Add” actions visually consistent for better UX cues.
+- Next: Quick visual pass to ensure hover states remain consistent.
+
+2025-11-19 15:49
+- Topics: Added basic phone number validation to AdminControl form submission.
+- Code: src/pages/AdminControl.jsx now trims phone input, enforces required 7–15 digit pattern (optional +), and reuses trimmed value in payload.
+- Decisions: Validate client-side before hitting the API to avoid bad requests.
+- Next: Test admin creation with valid/invalid phone numbers to confirm messaging.
+
+2025-11-21 10:49
+- Topics: Updated VisitHistory page to use new visit history endpoint with limit parameter.
+- Code: Added getVisitHistory API method to src/utils/api.js calling /visits/${buildingId}?limit=${limit} endpoint; updated src/pages/VisitHistory.jsx to use getVisitHistory instead of getTodayVisits with limit=100.
+- Decisions: New endpoint https://securityapp-backend.vercel.app/api/visits/buildingId?limit=100 provides proper visit history with pagination support; kept getTodayVisits for backward compatibility; limit defaults to 100 as per endpoint specification.
+- Next: Test visit history page to verify data loads correctly from new endpoint and confirm response structure matches existing normalization logic.
+
+2025-11-21 10:53
+- Topics: Removed building filter and added date filter to VisitHistory page.
+- Code: Removed building dropdown UI from src/pages/VisitHistory.jsx; added startDate and endDate state with date input fields; updated getVisitHistory API in src/utils/api.js to accept startDate and endDate parameters using URLSearchParams; buildingId is now automatically selected from first available building; fetchVisits useEffect now depends on startDate and endDate to trigger refetch on date changes.
+- Decisions: Building filter removed per user request; date filter uses HTML date inputs with labels for better UX; date parameters (startDate, endDate) are sent as query params to backend; buildingId still required by API so automatically fetched and set to first building; empty state message adapts based on whether date filter is active.
+- Next: Test date filtering functionality to verify backend accepts startDate/endDate parameters and returns filtered visit history; confirm date format compatibility with backend expectations.
+
+2025-11-21 10:57
+- Topics: Replaced visible date inputs with filter icon button and dropdown in VisitHistory page.
+- Code: Imported filterIcon from src/assets/filter.png and useRef in src/pages/VisitHistory.jsx; added isFilterMenuOpen state and filterMenuRef; replaced always-visible date inputs with filter button that opens dropdown containing date inputs; added useEffect to handle clicking outside dropdown to close it; filter button shows "Date Filter" when dates are active, "Filter" otherwise; added "Clear Filters" button in dropdown when dates are set; dropdown positioned absolute with z-20, styled consistently with other filter dropdowns in app.
+- Decisions: Use filter icon from assets folder per user request; date filters now hidden in dropdown until filter button clicked, matching pattern from AdminControl and SocietyControl pages; click outside handler improves UX by closing dropdown when user clicks elsewhere; clear filters button provides quick way to reset date selection.
+- Next: Test filter dropdown functionality, verify date filtering still works correctly, and confirm dropdown closes properly on outside clicks.
+
+2025-11-21 15:39
+- Topics: Replaced "Super Admin" role with "Building Admin" in AdminControl.
+- Code: Updated src/pages/AdminControl.jsx DEFAULT_ROLE_OPTIONS to change { value: 'super_admin', label: 'Super Admin' } to { value: 'building_admin', label: 'Building Admin' }.
+- Decisions: Use snake_case value 'building_admin' to match existing role naming pattern; keep label as "Building Admin" for UI display; building_admin remains non-restricted and available in default role options.
+- Next: Test admin creation with building_admin role to verify backend accepts the new role value and displays correctly in admin cards.
+
+2025-11-21 15:43
+- Topics: Changed Building Name field to dropdown with auto-fill address functionality in AdminControl form.
+- Code: Updated src/pages/AdminControl.jsx to: (1) fetch building options whenever modal opens (not just for security fields), (2) changed buildingName input to select dropdown populated from buildingOptions, (3) enhanced handleInputChange to auto-fill buildingAddress when buildingName is selected by finding matching building and setting its address, (4) clear both fields when building selection is cleared.
+- Decisions: Building dropdown available for all admin types; address auto-fills from selected building but remains editable; buildings fetched on modal open for better UX; dropdown shows building names with loading/error states consistent with existing patterns.
+- Next: Test building selection to verify address auto-fills correctly and remains editable; confirm buildings load for all modal contexts (Admin, Resident, Security).
+
+2025-11-21 15:51
+- Topics: Mapped "super_admin" role to "building_admin" throughout AdminControl to replace Super Admin with Building Admin in role dropdown.
+- Code: Updated src/pages/AdminControl.jsx to map super_admin to building_admin in multiple places: (1) availableRoles useMemo maps super_admin from backend admins to building_admin, (2) handleInputChange maps super_admin when role is changed via dropdown, (3) useEffect on modal open maps super_admin in formData, (4) getRoleForContext maps super_admin parameter, (5) handleSubmit ensures super_admin is mapped before API submission. DEFAULT_ROLE_OPTIONS already has building_admin instead of super_admin.
+- Decisions: Comprehensive mapping ensures "super_admin" from backend or user input is always converted to "building_admin" with "Building Admin" label; handles both "super_admin" and "super admin" variations; mapping happens at multiple layers (display, input, submission) for consistency.
+- Next: Test role dropdown to verify "Building Admin" appears instead of "Super Admin"; confirm existing admins with super_admin role display as "Building Admin" in the UI.
+
+2025-11-21 16:03
+- Topics: Fixed backend validation error for "building_admin" role by keeping "super_admin" as backend value while displaying "Building Admin" in UI.
+- Code: Updated src/pages/AdminControl.jsx to: (1) change DEFAULT_ROLE_OPTIONS value back to 'super_admin' with label 'Building Admin', (2) removed all mapping logic that converted super_admin to building_admin, (3) updated availableRoles to display custom label "Building Admin" for super_admin roles from backend while keeping value as "super_admin", (4) removed role mapping from handleInputChange, useEffect, getRoleForContext, and handleSubmit.
+- Decisions: Backend rejects "building_admin" as invalid role; frontend now sends "super_admin" (backend-accepted value) while UI displays "Building Admin" label for better UX; follows rule to modify frontend to match backend API expectations; removed unnecessary mapping logic that caused validation errors.
+- Next: Test admin creation with "Building Admin" role selection to verify backend accepts "super_admin" value and no validation errors occur.
+
+2025-11-21 16:12
+- Topics: Fixed role display in admin response to show "Building Admin" instead of "super admin" in admin cards.
+- Code: Added formatRoleForDisplay helper function in src/pages/AdminControl.jsx that maps "super_admin" to "Building Admin" for display; updated fetchAdmins normalization to use formatRoleForDisplay instead of toDisplayString for role field; function handles both "super_admin" and "super admin" variations and formats other roles with proper capitalization.
+- Decisions: Role display now consistently shows "Building Admin" in admin cards when backend returns "super_admin"; formatRoleForDisplay centralizes role formatting logic for consistent display across the UI; maintains backend value as "super_admin" for API compatibility while improving UX with friendly labels.
+- Next: Verify admin cards display "Building Admin" for users with super_admin role from backend; confirm role sorting and filtering still work correctly with formatted display values.
+
+2025-11-21 16:21
+- Topics: Enhanced role display formatting to ensure "Building Admin" shows in response instead of "super admin", and improved handling of role variations.
+- Code: Updated src/pages/AdminControl.jsx to: (1) store original backend role value in roleValue field alongside formatted role for display, (2) enhanced formatRoleForDisplay to handle more variations (super_admin, superadmin, super admin with any case), (3) updated availableRoles to use roleValue (original backend value) instead of formatted role to maintain correct dropdown values, (4) improved role matching logic to catch all super_admin variations including mixed case and different separators.
+- Decisions: Separating original backend value (roleValue) from display value (role) ensures dropdown options use correct backend values while UI shows friendly labels; more robust pattern matching handles various backend response formats; maintains API compatibility by sending "super_admin" while displaying "Building Admin" everywhere in UI.
+- Next: Test admin list to verify all "super_admin" variations from backend display as "Building Admin" in response; confirm dropdown options work correctly with original backend values.
+
+2025-11-21 21:59
+- Topics: Separated Building Admin creation from generic Admin creation, added dedicated "Add Building Admin" button with building selection requirement.
+- Code: Updated src/pages/AdminControl.jsx to: (1) add 'super_admin' to RESTRICTED_ROLE_KEYS to prevent it from appearing in default "Add Admin" dropdown, (2) add "Add Building Admin" button that opens modal with building_admin context, (3) create requiresBuildingAdminFields useMemo to conditionally show building selection, (4) update handleOpenModalForRole to handle 'building_admin'/'super_admin' and set role to 'super_admin' for backend compatibility, (5) add building selection validation and payload for building admin, (6) show building dropdown for both security and building admin, (7) employee code field only shows for security (not building admin), (8) dynamic submit button text based on modalContext, (9) add 'building_admin' to MODAL_TITLES.
+- Decisions: Building Admin (super_admin) now requires building selection and is created via dedicated button; generic "Add Admin" button only creates regular 'admin' role (super_admin is restricted); building admin will see only their assigned building's details; maintains backend compatibility by sending 'super_admin' value while displaying "Building Admin" in UI; separates building admin flow from security flow (no employee code required for building admin).
+- Next: Test "Add Building Admin" button to verify building selection is required and super_admin role is created with buildingId; confirm "Add Admin" button no longer shows super_admin option; verify building admin users can only see their assigned building's details.
+
+2025-11-21 22:52
+- Topics: Replaced "Building Name" field with "Assign Building" dropdown in admin creation form.
+- Code: Updated src/pages/AdminControl.jsx to: (1) replace "Building Name" input/dropdown with "Assign Building" dropdown using buildingId instead of buildingName, (2) update handleInputChange to handle buildingId selection and auto-fill buildingName and buildingAddress from selected building, (3) change dropdown to use building.id as value and display building.name with address, (4) update payload to always include buildingId when selected (not just for security/building admin), (5) remove duplicate conditional "Assign Building" field that was only shown for security/building admin, (6) keep buildingName in payload for backward compatibility while using buildingId as primary field.
+- Decisions: "Assign Building" field is now always visible for all admin types; uses buildingId (building ID) instead of buildingName (building name) for more reliable building assignment; auto-fills building name and address when building is selected; maintains buildingName in payload for backend compatibility; building selection is now consistent across all admin creation flows.
+- Next: Test admin creation to verify "Assign Building" dropdown works correctly and auto-fills address; confirm buildingId is sent in payload for all admin types when building is selected; verify building assignment works for regular admin, building admin, and security roles.
+
+2025-11-21 22:56
+- Topics: Improved error handling and payload validation for admin creation to fix 400 validation errors.
+- Code: Updated src/utils/api.js to pass through detailed error information (errors array, error object) from backend validation responses. Updated src/pages/AdminControl.jsx to: (1) add console logging for payload and error details, (2) extract and display detailed validation errors from backend (field-specific errors with path and message), (3) only include fields with values in payload to avoid empty string validation errors, (4) convert securityGuards and employees to numbers when they have values, (5) trim and validate all string fields before including in payload, (6) conditionally include buildingId, buildingName, buildingAddress, securityGuards, employees only when they have valid values.
+- Decisions: Better error handling shows specific field validation errors from backend instead of generic "Validation failed" message; payload now only includes fields with actual values to prevent empty string validation errors; numeric fields are properly converted to numbers; console logging helps debug payload issues during development.
+- Next: Test admin creation and check browser console for detailed error messages to identify which fields are failing validation; verify payload only includes fields with values; confirm numeric fields are sent as numbers not strings.
+
+2025-11-22 12:21
+- Topics: Changed Building Admin to use separate 'building_admin' role instead of 'super_admin'.
+- Code: Updated src/pages/AdminControl.jsx to: (1) change DEFAULT_ROLE_OPTIONS to use 'building_admin' value instead of 'super_admin', (2) update RESTRICTED_ROLE_KEYS to include 'building_admin' instead of 'super_admin', (3) update formatRoleForDisplay to handle 'building_admin' as primary role with 'super_admin' as legacy fallback, (4) update availableRoles to handle 'building_admin' with 'super_admin' as backward compatibility, (5) update requiresBuildingAdminFields to check for 'building_admin' role, (6) update handleOpenModalForRole to set role to 'building_admin' instead of 'super_admin', (7) keep isBuildingAdmin check to accept both 'building_admin' and 'super_admin' inputs for backward compatibility.
+- Decisions: Building Admin now uses 'building_admin' as a separate role distinct from 'super_admin'; backend should accept 'building_admin' as valid role; maintains backward compatibility by handling legacy 'super_admin' values from backend responses; 'building_admin' is restricted from default "Add Admin" dropdown and only available via "Add Building Admin" button; formatRoleForDisplay and availableRoles handle both roles but prefer 'building_admin'.
+- Next: Test "Add Building Admin" button to verify 'building_admin' role is sent to backend and accepted; confirm backend validation accepts 'building_admin' as valid role; verify building selection is required and works correctly; check if backend needs to be updated to accept 'building_admin' role if it currently only accepts 'super_admin'.
+
+2025-11-22 12:37
+- Topics: Fixed register endpoint error handling and improved network error catching in api.js.
+- Code: Updated src/utils/api.js apiRequest function to: (1) wrap fetch call in try-catch to handle network errors (CORS, connection failures), (2) improve error message extraction to handle various error formats from backend, (3) add URL logging for debugging, (4) attach response status, statusText, url, errors, error, and responseData to error object, (5) handle network errors separately with clear messages, (6) preserve existing error structure for validation errors, (7) add console logging for request/response debugging.
+- Decisions: Better error handling catches network errors before response parsing; network errors are distinguished from HTTP errors; error object contains full context (status, url, responseData) for debugging; console logging helps debug payload and response issues; maintains backward compatibility with existing error handling in AdminControl.
+- Next: Test admin creation with register endpoint to verify network errors are caught properly; check browser console for request/response logs; verify error messages display correctly for different error types (network, validation, etc.); confirm register endpoint URL resolves correctly.
+
+2025-11-22 12:45
+- Topics: Removed "Add Admin" button from AdminControl page.
+- Code: Updated src/pages/AdminControl.jsx to: (1) remove "Add Admin" button that called handleOpenModalForRole() without arguments, (2) update submit button text fallback from 'Add Admin' to 'Submit' for default modal context.
+- Decisions: Only role-specific buttons remain (Add Resident, Add Security, Add Building Admin); generic "Add Admin" button removed as requested; submit button text updated to avoid confusion; modal can still open with default context in edge cases but no button triggers it directly.
+- Next: Verify only role-specific buttons are visible; confirm modal functionality still works for Resident, Security, and Building Admin creation; test that no generic admin creation is possible without role selection.
+
+2025-11-22 12:54
+- Topics: Corrected visits API endpoint implementation to ensure proper query parameter handling.
+- Code: Updated src/utils/api.js getVisitHistory function to: (1) add validation to ensure buildingId is required and throw error if missing, (2) ensure limit parameter is always included in query string as per endpoint requirement, (3) trim and validate startDate/endDate before adding to query params to avoid empty values, (4) improve query parameter construction to handle edge cases properly.
+- Decisions: Endpoint URL format /visits/${buildingId}?limit=100 is correct; limit parameter always included even if default value; optional date parameters only added when they have valid values; buildingId validation prevents API calls with missing required parameter.
+- Next: Test visit history page to verify endpoint calls correctly with buildingId and limit parameter; confirm date filtering works when startDate/endDate are provided; verify error handling when buildingId is missing.
+
+2025-11-22 13:02
+- Topics: Added comprehensive logging and improved error handling for VisitHistory page debugging.
+- Code: Updated src/pages/VisitHistory.jsx to: (1) add detailed console logging for building fetch and visit fetch operations (logs request parameters, API responses, normalized data), (2) enhanced extractArray function with logging to track where arrays are found in response structure, (3) added additional candidate paths (payload.visits.data, payload.visits.items, payload.visits.results) to handle more response structures, (4) improved empty state messages to distinguish between "no building selected" and "no visits found", (5) added error detail logging (status, statusText, url, responseData). Updated src/utils/api.js getVisitHistory to add logging for endpoint URL and buildingId parameter.
+- Decisions: Comprehensive logging helps diagnose why visits aren't displaying; enhanced extractArray handles more backend response structures; better empty states improve user feedback; error logging provides full context for debugging API issues.
+- Next: Check browser console logs to identify the issue (missing buildingId, wrong response structure, API errors, etc.); verify API endpoint URL format matches backend expectations; confirm response data structure and update extractArray if needed based on actual API response.
+
+2025-11-22 13:11
+- Topics: Fixed VisitHistory to correctly parse API response structure with visits array at data.visits.
+- Code: Updated src/pages/VisitHistory.jsx to: (1) reorder extractArray function to check payload?.data?.visits first since API returns { success: true, data: { visits: [...], pagination: {...} } }, (2) update normalizeVisits to correctly extract visitor name from visitorId.name or visitorId.fullContactInfo.name, (3) extract approved by from approvedBy.name or approvedBy.fullName (approvedBy is an object, not a string), (4) extract purpose/remarks from purpose or remarks fields, (5) extract date/time from createdAt, updatedAt, checkInTime, or approvedAt fields, (6) add better logging to track which array path is found and debug issues.
+- Decisions: API response structure is { success: true, data: { visits: [...], pagination: {...} } } so visits array is at data.visits; visitor information is nested in visitorId object; approvedBy is also an object with name/fullName properties; building name may not be in visit object so fallback to buildingId for display; prioritize most specific paths in extractArray for better performance.
+- Next: Test VisitHistory page to verify visits display correctly; confirm visitor names, approved by names, and date/times show properly; verify pagination information is handled correctly if needed.
+
+2025-11-22 14:22
+- Topics: Updated VisitHistory to allow super admin to view all visits across all buildings instead of just one building.
+- Code: Updated src/pages/VisitHistory.jsx to: (1) add userRole state to detect if current user is super_admin or admin from localStorage authUser, (2) add buildings state to store all buildings list, (3) modify fetchBuildings useEffect to set buildings state and default selectedBuildingId to 'all' for super admin users, (4) update fetchVisits useEffect to handle 'all' selection by fetching visits from all buildings in parallel and combining results, (5) add building dropdown in UI (visible only for super_admin/admin) to select "All Buildings" or specific building, (6) sort combined visits by date (most recent first), (7) update empty state messages to handle 'all' selection appropriately.
+- Decisions: Super admin and admin users can now see all visits across all buildings by default; building dropdown allows switching between "All Buildings" and specific buildings; visits from multiple buildings are fetched in parallel for performance; combined visits are sorted by date for consistency; building dropdown is only shown for super_admin/admin roles to avoid confusion for other users; default to 'all' for super admin to provide comprehensive view immediately.
+- Next: Test VisitHistory page as super admin to verify all visits display correctly across all buildings; confirm building dropdown works and switching between "All" and specific buildings updates visits correctly; verify date filtering works with "All Buildings" selection; test as non-admin user to ensure building dropdown is hidden and default building is selected.
+
+2025-11-23 20:00
+- Topics: Updated SocietyControl to filter buildings based on logged-in user's assigned building.
+- Code: Updated src/pages/SocietyControl.jsx to: (1) add userBuildingId and userRole state to get user information from localStorage authUser, (2) extract buildingId from user object using pickValue helper checking multiple possible paths (buildingId, building.id, building._id, assignedBuilding, assignedBuildingId), (3) filter buildings list to show only user's building if user is not super_admin or admin, (4) compare building IDs as strings to handle different ID formats, (5) hide "Add New Building" button for non-admin users (only show for super_admin, admin, or when role is undefined), (6) update fetchBuildings useEffect to wait for user info before fetching and refetch when userRole or userBuildingId changes.
+- Decisions: Users assigned to a specific building will only see their building's details; super admin and admin users see all buildings; building ID comparison uses string conversion to handle MongoDB ObjectId vs string formats; "Add New Building" button is hidden for regular users to prevent unauthorized building creation; filtering happens after fetching all buildings to ensure proper comparison.
+- Next: Test SocietyControl page as building admin to verify only assigned building is shown; test as super admin to verify all buildings are shown; confirm "Add New Building" button is hidden for non-admin users; verify building filtering works correctly with different building ID formats.
 
