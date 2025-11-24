@@ -574,11 +574,21 @@ export default function VisitHistory() {
           <table className="w-full min-w-[600px]">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-3 sm:px-6 py-3 text-left text-sm font-semibold text-gray-800">Name</th>
-                <th className="px-3 sm:px-6 py-3 text-left text-sm font-semibold text-gray-800">Name</th>
-                <th className="px-3 sm:px-6 py-3 text-left text-sm font-semibold text-gray-800">Approved by</th>
-                <th className="px-3 sm:px-6 py-3 text-left text-sm font-semibold text-gray-800">Remarks</th>
-                <th className="px-3 sm:px-6 py-3 text-left text-sm font-semibold text-gray-800">Date and Time</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-sm font-semibold text-gray-800">
+                  Visitor Name
+                </th>
+                <th className="px-3 sm:px-6 py-3 text-left text-sm font-semibold text-gray-800">
+                  Building Name
+                </th>
+                <th className="px-3 sm:px-6 py-3 text-left text-sm font-semibold text-gray-800">
+                  Approved by
+                </th>
+                <th className="px-3 sm:px-6 py-3 text-left text-sm font-semibold text-gray-800">
+                  Remarks
+                </th>
+                <th className="px-3 sm:px-6 py-3 text-left text-sm font-semibold text-gray-800">
+                  Date and Time
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
