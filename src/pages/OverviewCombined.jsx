@@ -493,31 +493,50 @@ function Dashboard() {
         if (userData) {
           const user = JSON.parse(userData)
           const role = user?.role || user?.roleValue || ''
-          const buildingId = pickValue(user, [
+
+          // Derive a primitive buildingId from various possible shapes
+          let rawBuildingId = pickValue(user, [
             'buildingId',
+            'buildingId', // duplicate for safety
             'building.id',
             'building._id',
-            'assignedBuilding',
-            'assignedBuildingId'
+            'assignedBuildingId',
+            'assignedBuilding.id',
+            'assignedBuilding._id',
           ])
-          const residentId = pickValue(user, [
+
+          if (!rawBuildingId) {
+            const buildingObj = pickValue(user, ['assignedBuilding', 'building'])
+            if (buildingObj && typeof buildingObj === 'object') {
+              rawBuildingId = pickValue(buildingObj, ['_id', 'id'])
+            }
+          }
+
+          const finalBuildingId =
+            rawBuildingId && typeof rawBuildingId !== 'object' ? rawBuildingId : null
+
+          // Only treat explicit resident fields as residentId; don't fall back to generic _id/id
+          let rawResidentId = pickValue(user, [
             'residentId',
             'resident.id',
             'resident._id',
-            '_id',
-            'id'
           ])
+          if (rawResidentId && typeof rawResidentId === 'object') {
+            rawResidentId = pickValue(rawResidentId, ['_id', 'id'])
+          }
+          const finalResidentId =
+            rawResidentId && typeof rawResidentId !== 'object' ? rawResidentId : null
           
           setUserRole(role?.toLowerCase())
-          setUserBuildingId(buildingId)
-          setUserResidentId(residentId || DEFAULT_RESIDENT_ID)
-          console.log('[OverviewCombined] User role:', role, 'buildingId:', buildingId, 'residentId:', residentId)
+          setUserBuildingId(finalBuildingId)
+          setUserResidentId(finalResidentId)
+          console.log('[OverviewCombined] User role:', role, 'buildingId:', finalBuildingId, 'residentId:', finalResidentId)
         } else {
-          setUserResidentId(DEFAULT_RESIDENT_ID)
+          setUserResidentId(null)
         }
       } catch (err) {
         console.error('[OverviewCombined] Failed to get user info', err)
-        setUserResidentId(DEFAULT_RESIDENT_ID)
+        setUserResidentId(null)
       }
     }
     getUserInfo()
@@ -648,14 +667,18 @@ function Dashboard() {
         setUpcomingVisitors(combinedVisitors)
         setCurrentVisitorPage(0)
       } else if (userBuildingId && userResidentId) {
-        // For regular users, fetch from their building
-        console.log('[OverviewCombined] Fetching upcoming visitors for user building:', userBuildingId)
+        // For real resident users, fetch from their building + resident
+        console.log(
+          '[OverviewCombined] Fetching upcoming visitors for user building/resident:',
+          userBuildingId,
+          userResidentId
+        )
         const response = await api.getUpcomingVisitors(userBuildingId, userResidentId)
         const normalized = normalizeUpcomingVisitors(response)
         setUpcomingVisitors(normalized)
         setCurrentVisitorPage(0)
       } else {
-        // Fallback to default
+        // Fallback to default demo/seed IDs when we don't have a proper resident-bound context
         console.log('[OverviewCombined] Using default building/resident IDs')
         const response = await api.getUpcomingVisitors(DEFAULT_BUILDING_ID, DEFAULT_RESIDENT_ID)
         const normalized = normalizeUpcomingVisitors(response)

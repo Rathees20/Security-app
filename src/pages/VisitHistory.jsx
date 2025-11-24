@@ -130,13 +130,18 @@ const normalizeVisits = (payload) =>
       'guardName',
     ]);
     
-    // Extract building name (might not be in visit object, so use buildingId as fallback)
+    // Extract building id and name (name might not be present on the visit object)
+    const rawBuildingId = pickValue(item, [
+      'buildingId',
+      'building.id',
+      'building._id',
+    ]);
     const buildingName = toDisplayString(
       pickValue(item, [
         'buildingName',
         'building.name',
         'building',
-      ]) || pickValue(item, ['buildingId']),
+      ]),
       'Building'
     );
     
@@ -167,6 +172,7 @@ const normalizeVisits = (payload) =>
     return {
       id: pickValue(item, ['_id', 'id', 'visitId']) ?? `visit-${index}`,
       name: toDisplayString(visitorName, 'Unknown Visitor'),
+      buildingId: toDisplayString(rawBuildingId, ''),
       buildingName,
       approvedBy: toDisplayString(approvedByName, 'Not available'),
       remarks,
@@ -186,24 +192,35 @@ export default function VisitHistory() {
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
   const filterMenuRef = useRef(null);
   
-  // Get current user role from localStorage
+  // Get current user role and assigned building from localStorage
   const [userRole, setUserRole] = useState(null);
+  const [userBuildingId, setUserBuildingId] = useState(null);
   
   useEffect(() => {
-    const getUserRole = () => {
+    const getUserInfo = () => {
       try {
         const userData = window.localStorage.getItem('authUser');
         if (userData) {
           const user = JSON.parse(userData);
           const role = user?.role || user?.roleValue || '';
+          const buildingId = pickValue(user, [
+            'buildingId',
+            'building.id',
+            'building._id',
+            'buildingId',
+            'assignedBuilding',
+            'assignedBuildingId'
+          ]);
+
           setUserRole(role?.toLowerCase());
-          console.log('[VisitHistory] Current user role:', role);
+          setUserBuildingId(buildingId);
+          console.log('[VisitHistory] Current user role:', role, 'buildingId:', buildingId);
         }
       } catch (err) {
-        console.error('[VisitHistory] Failed to get user role', err);
+        console.error('[VisitHistory] Failed to get user info', err);
       }
     };
-    getUserRole();
+    getUserInfo();
   }, []);
 
   useEffect(() => {
@@ -211,32 +228,86 @@ export default function VisitHistory() {
       setError('');
       try {
         console.log('[VisitHistory] Fetching buildings...');
+        const isAdminUser = userRole === 'super_admin' || userRole === 'admin';
         const response = await api.getBuildings();
         console.log('[VisitHistory] Buildings API response:', response);
-        const normalized = normalizeBuildings(response);
-        console.log('[VisitHistory] Normalized buildings:', normalized);
+        let normalized = normalizeBuildings(response);
+        console.log('[VisitHistory] Normalized buildings before filtering:', normalized);
+
+        // If user has an assigned building and is not super/admin, restrict to that building only
+        if (userBuildingId && !isAdminUser) {
+          const userBuildingIdStr = String(userBuildingId);
+          const matchedBuilding = normalized.find(
+            (building) => String(building.id) === userBuildingIdStr
+          );
+
+          if (matchedBuilding) {
+            normalized = [matchedBuilding];
+            console.log(
+              '[VisitHistory] Restricted buildings to assigned buildingId:',
+              userBuildingIdStr,
+              'Result:',
+              normalized
+            );
+          } else {
+            // Backend knows the assigned building even if /buildings doesn't return it
+            normalized = [];
+            console.warn(
+              '[VisitHistory] Assigned buildingId not found in buildings list for userBuildingId:',
+              userBuildingIdStr
+            );
+          }
+        } else if (isAdminUser) {
+          console.log('[VisitHistory] Super admin/admin - showing all buildings in VisitHistory');
+        } else {
+          console.log('[VisitHistory] No buildingId found for user - showing all buildings in VisitHistory');
+        }
+
         setBuildings(normalized);
         
-        // For super admin, default to 'all', otherwise select first building
+        // For super admin/admin, default to 'all'
+        // For other roles, always prefer user's assigned buildingId for selection
         if (normalized.length > 0) {
-          if (userRole === 'super_admin' || userRole === 'admin') {
-            // Super admin can see all buildings, default to 'all'
+          if (isAdminUser) {
             if (selectedBuildingId === 'all' || !selectedBuildingId) {
               setSelectedBuildingId('all');
             }
           } else {
-            // For other roles, select first building
-            if (!selectedBuildingId || selectedBuildingId === 'all') {
+            if (userBuildingId) {
+              const userBuildingIdStr = String(userBuildingId);
+              if (
+                !selectedBuildingId ||
+                selectedBuildingId === 'all' ||
+                String(selectedBuildingId) !== userBuildingIdStr
+              ) {
+                console.log(
+                  '[VisitHistory] Setting selectedBuildingId to user assigned buildingId:',
+                  userBuildingIdStr
+                );
+                setSelectedBuildingId(userBuildingId);
+              }
+            } else if (!selectedBuildingId || selectedBuildingId === 'all') {
               const firstWithId = normalized.find((building) => building.id);
               if (firstWithId?.id) {
-                console.log('[VisitHistory] Setting selectedBuildingId to:', firstWithId.id);
+                console.log(
+                  '[VisitHistory] Setting selectedBuildingId to first available building for non-admin:',
+                  firstWithId.id
+                );
                 setSelectedBuildingId(firstWithId.id);
               }
             }
           }
         } else {
-          console.warn('[VisitHistory] No buildings found');
-          setError('No buildings available. Please create a building first.');
+          console.warn('[VisitHistory] No buildings found for current user');
+          setError('No buildings available for your account. Please contact an administrator.');
+          // For restricted users, still prefer their assigned buildingId for visit fetching
+          if (!isAdminUser && userBuildingId) {
+            console.log(
+              '[VisitHistory] Using userBuildingId for visits despite empty buildings list:',
+              userBuildingId
+            );
+            setSelectedBuildingId(userBuildingId);
+          }
         }
       } catch (err) {
         console.error('[VisitHistory] Failed to fetch buildings', err);
@@ -246,7 +317,7 @@ export default function VisitHistory() {
 
     fetchBuildings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userRole]);
+  }, [userRole, userBuildingId]);
 
   // Handle clicking outside filter menu to close it
   useEffect(() => {
@@ -267,8 +338,21 @@ export default function VisitHistory() {
   }, [isFilterMenuOpen]);
 
   useEffect(() => {
-    if (!selectedBuildingId || selectedBuildingId === 'all' && buildings.length === 0) {
-      return;
+    const isAdminUser = userRole === 'super_admin' || userRole === 'admin';
+
+    // Guard conditions based on role
+    if (isAdminUser) {
+      if (!selectedBuildingId || (selectedBuildingId === 'all' && buildings.length === 0)) {
+        return;
+      }
+    } else {
+      // Restricted users must have a userBuildingId; selectedBuildingId is secondary
+      if (!userBuildingId) {
+        console.warn(
+          '[VisitHistory] No userBuildingId for restricted user; skipping visit fetch'
+        );
+        return;
+      }
     }
 
     const fetchVisits = async () => {
@@ -276,7 +360,7 @@ export default function VisitHistory() {
       setError('');
       try {
         // If 'all' is selected and user is super admin, fetch visits for all buildings
-        if (selectedBuildingId === 'all' && (userRole === 'super_admin' || userRole === 'admin')) {
+        if (selectedBuildingId === 'all' && isAdminUser) {
           console.log('[VisitHistory] Fetching visits for ALL buildings');
           const allVisitsPromises = buildings.map((building) =>
             api.getVisitHistory(building.id, 100, startDate || null, endDate || null)
@@ -305,9 +389,18 @@ export default function VisitHistory() {
           }
         } else {
           // Fetch visits for specific building
-          console.log('[VisitHistory] Fetching visits for buildingId:', selectedBuildingId, 'limit: 100', 'startDate:', startDate, 'endDate:', endDate);
+          const buildingIdForRequest = isAdminUser ? selectedBuildingId : userBuildingId;
+          console.log(
+            '[VisitHistory] Fetching visits for buildingId:',
+            buildingIdForRequest,
+            'limit: 100',
+            'startDate:',
+            startDate,
+            'endDate:',
+            endDate
+          );
           const response = await api.getVisitHistory(
-            selectedBuildingId, 
+            buildingIdForRequest, 
             100, 
             startDate || null, 
             endDate || null
@@ -330,7 +423,18 @@ export default function VisitHistory() {
           url: err.url,
           responseData: err.responseData
         });
-        setError(err.message || 'Unable to load visits');
+
+        let errorMessage = err.message || 'Unable to load visits';
+        if (
+          err.responseData?.message ===
+          'Access denied. You can only access your assigned building.'
+        ) {
+          // Provide a clearer UI message while preserving backend intent
+          errorMessage =
+            'You can only view visit history for your assigned building. Please contact an administrator if this seems incorrect.';
+        }
+
+        setError(errorMessage);
         setVisits([]);
       } finally {
         setIsLoadingVisits(false);
@@ -338,7 +442,20 @@ export default function VisitHistory() {
     };
 
     fetchVisits();
-  }, [selectedBuildingId, startDate, endDate, buildings, userRole]);
+  }, [selectedBuildingId, startDate, endDate, buildings, userRole, userBuildingId]);
+
+  // Resolve a human-readable building name for each visit
+  const getBuildingDisplayName = (visit) => {
+    const id = visit.buildingId;
+    if (id && buildings.length) {
+      const match = buildings.find((b) => String(b.id) === String(id));
+      if (match?.name) {
+        return match.name;
+      }
+    }
+    // Fallback to whatever name was present on the visit object or a generic label
+    return visit.buildingName || 'Building';
+  };
 
   const filteredVisits = visits.filter((visit) => {
     const query = searchTerm.trim().toLowerCase();
@@ -494,7 +611,9 @@ export default function VisitHistory() {
                 filteredVisits.map((visit) => (
                   <tr key={visit.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-3 sm:px-6 py-4 text-sm text-gray-700">{visit.name}</td>
-                    <td className="px-3 sm:px-6 py-4 text-sm text-gray-700">{visit.buildingName}</td>
+                    <td className="px-3 sm:px-6 py-4 text-sm text-gray-700">
+                      {getBuildingDisplayName(visit)}
+                    </td>
                     <td className="px-3 sm:px-6 py-4 text-sm text-gray-700">{visit.approvedBy}</td>
                     <td className="px-3 sm:px-6 py-4 text-sm text-gray-700">{visit.remarks}</td>
                     <td className="px-3 sm:px-6 py-4 text-sm text-gray-700">{visit.dateTime}</td>

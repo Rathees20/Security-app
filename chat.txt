@@ -1,3 +1,37 @@
+2025-11-24 00:30
+- Topics: Refined VisitHistory building selection and visit fetching for building-scoped users.
+- Code: Updated src/pages/VisitHistory.jsx to treat super_admin/admin as isAdminUser and keep their “all buildings” behavior, while for restricted roles always preferring userBuildingId when fetching visits. If the assigned building is missing from /buildings, the page now still uses userBuildingId for visit requests and sets selectedBuildingId accordingly, and the visit-fetch guard for restricted users now checks userBuildingId instead of selectedBuildingId.
+- Decisions: Ensures BUILDING_ADMIN and similar roles never query visits for unassigned buildings (eliminating 403 access denied) while preserving admin/super_admin’s global visibility. Buildings list remains best-effort for non-admins, but visit access now strictly follows backend-assigned buildingId.
+- Next: Retest VisitHistory as BUILDING_ADMIN with buildingId 68b0… to confirm visits load correctly; verify super_admin/admin still see “all buildings” without errors.
+
+2025-11-24 00:50
+- Topics: Fixed OverviewCombined Upcoming Visitors not showing due to invalid resident/building IDs.
+- Code: Updated src/pages/OverviewCombined.jsx user info effect to derive a primitive buildingId from authUser (handling buildingId, building.id, building._id, assignedBuildingId, assignedBuilding.id/_id, and nested building objects) and to only treat explicit resident fields (residentId, resident.id, resident._id) as residentId. Removed the automatic fallback of userResidentId to DEFAULT_RESIDENT_ID at load time so that non-resident accounts no longer send their own _id/id as a fake residentId; fetchUpcomingVisitors now uses userBuildingId + userResidentId only when both are real, otherwise falls back to DEFAULT_BUILDING_ID/DEFAULT_RESIDENT_ID.
+- Decisions: Prevents /pre-approvals calls like /pre-approvals/<buildingId>/<adminUserId> that return no data, while still allowing true resident accounts to see their upcoming visitors dynamically. Non-resident roles (admins/building admins) now reliably hit the default demo IDs when no proper resident context exists, so the Upcoming Visitors section shows data instead of staying empty.
+- Next: Retest OverviewCombined as resident and as BUILDING_ADMIN/admin: confirm residents see their own upcoming visitors, and that admin-type users at least see the default upcoming visitors instead of an empty list.
+
+2025-11-24 01:05
+- Topics: Changed VisitHistory super admin/admin building column to show building ID instead of name.
+- Code: Updated normalizeVisits in src/pages/VisitHistory.jsx to extract a raw buildingId from visit items (buildingId, building.id, building._id) and include it in the normalized visit object. Adjusted the table render so that for userRole super_admin/admin, the second column displays visit.buildingId (falling back to buildingName), while other roles still see the building name as before.
+- Decisions: Super admins and admins now see precise building IDs in visit history for easier cross-checking with backend data, without changing API calls, filters, or restricted-role behavior.
+- Next: Verify VisitHistory as super_admin/admin to confirm the second column shows building IDs; ensure non-admin roles continue to see building names.
+
+2025-11-24 01:10
+- Topics: Reverted VisitHistory second column to always display building name instead of ID.
+- Code: Updated the visit table render in src/pages/VisitHistory.jsx so the second column now always uses visit.buildingName, removing the previous role-based switch to buildingId for super_admin/admin users. Left buildingId in the normalized visit object for potential debugging but no longer surface it in the UI.
+- Decisions: Aligns with requirement that the “Name” (building) column consistently show human-readable building names for all roles, avoiding confusion from raw IDs in the table while preserving all earlier access control fixes.
+- Next: Visually verify VisitHistory for super_admin/admin to confirm only building names appear in the second column and that other functionality remains unaffected.
+
+2025-11-24 01:20
+- Topics: Ensured VisitHistory always displays building names by mapping buildingId through the buildings list.
+- Code: Updated normalizeVisits in src/pages/VisitHistory.jsx to stop falling back to buildingId when computing buildingName (now only uses buildingName/building.name/building fields) and added getBuildingDisplayName helper that, given a visit, looks up its buildingId in the loaded buildings array and returns the matching building’s name, falling back to visit.buildingName or a generic label. The table’s second column now calls getBuildingDisplayName(visit) so raw IDs are never shown even when visits only carry buildingId.
+- Decisions: Guarantees a consistent, human-readable building name in the Visit History table for all roles while still supporting APIs that return only buildingId per visit; reuses the already-fetched buildings list instead of changing backend contracts.
+- Next: Reload VisitHistory as super_admin/BUILDING_ADMIN to confirm the second column shows building names (not IDs) for all rows and that visit fetching still respects building access rules.
+
+
+
+
+
 2025-10-31 13:30
 - Topics: Connected VisitHistory, SocietyControl, and AdminControl pages to backend services using new API helper.
 - Code: Added src/utils/api.js; updated src/pages/VisitHistory.jsx, src/pages/SocietyControl.jsx, src/pages/AdminControl.jsx.
