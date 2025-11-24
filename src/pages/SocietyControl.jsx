@@ -81,6 +81,39 @@ const toDisplayString = (value, fallback = '') => {
   return fallback;
 };
 
+// Helper to download an array of row objects as CSV
+const downloadAsCsv = (filenameBase, rows) => {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return;
+  }
+
+  const headers = Object.keys(rows[0]);
+  const escapeCell = (value) => {
+    const str = value == null ? '' : String(value);
+    const escaped = str.replace(/"/g, '""');
+    return `"${escaped}"`;
+  };
+
+  const csvLines = [];
+  csvLines.push(headers.map(escapeCell).join(','));
+  rows.forEach((row) => {
+    const line = headers.map((key) => escapeCell(row[key]));
+    csvLines.push(line.join(','));
+  });
+
+  const csvContent = csvLines.join('\r\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+  link.href = url;
+  link.setAttribute('download', `${filenameBase}-${timestamp}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
 export default function SocietyControl() {
   const [buildings, setBuildings] = useState([]);
   const [isLoadingBuildings, setIsLoadingBuildings] = useState(false);
@@ -430,19 +463,48 @@ export default function SocietyControl() {
             </div>
           )}
         </div>
-        
-        {/* Add New Building Button - Only show for super admin/admin */}
-        {(userRole === 'super_admin' || userRole === 'admin' || !userRole) && (
+
+        {/* Download + Add New Building Buttons */}
+        <div className="flex gap-3">
           <button
-            className="flex items-center gap-2 px-4 py-3 bg-[#B00020] text-white rounded-lg hover:bg-red-700 transition-colors justify-center"
-            onClick={() => setIsModalOpen(true)}
+            type="button"
+            onClick={() => {
+              if (!sortedBuildings || sortedBuildings.length === 0) {
+                return;
+              }
+              const rows = sortedBuildings.map((building) => ({
+                Name: building.name || '',
+                Location: building.location || '',
+                ProgressPercent: building.progress ?? '',
+                Date: building.date || '',
+              }));
+              downloadAsCsv('buildings', rows);
+            }}
+            className="flex items-center gap-2 px-4 py-3 border border-[#B00020] text-[#B00020] rounded-lg hover:bg-[#B00020]/10 transition-colors justify-center text-sm"
           >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+            <svg
+              className="w-4 h-4 text-[#B00020]"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path d="M3 3a2 2 0 012-2h6a1 1 0 01.707.293l4 4A1 1 0 0116 7h-3a1 1 0 01-1-1V3H5v14h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H5a2 2 0 01-2-2V3z" />
+              <path d="M11 11a1 1 0 10-2 0v1.586L8.293 12.88a1 1 0 00-1.414 1.415l3 3a1 1 0 001.414 0l3-3a1 1 0 10-1.414-1.415L11 12.586V11z" />
             </svg>
-            <span className="text-sm">Add New Building</span>
+            <span>Download CSV</span>
           </button>
-        )}
+
+          {(userRole === 'super_admin' || userRole === 'admin' || !userRole) && (
+            <button
+              className="flex items-center gap-2 px-4 py-3 bg-[#B00020] text-white rounded-lg hover:bg-red-700 transition-colors justify-center"
+              onClick={() => setIsModalOpen(true)}
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+              </svg>
+              <span className="text-sm">Add New Building</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* All Buildings Section */}

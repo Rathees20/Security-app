@@ -28,6 +28,13 @@
 - Decisions: Guarantees a consistent, human-readable building name in the Visit History table for all roles while still supporting APIs that return only buildingId per visit; reuses the already-fetched buildings list instead of changing backend contracts.
 - Next: Reload VisitHistory as super_admin/BUILDING_ADMIN to confirm the second column shows building names (not IDs) for all rows and that visit fetching still respects building access rules.
 
+2025-11-24 01:30
+- Topics: Added CSV download options to AdminControl and SocietyControl pages.
+- Code: In src/pages/AdminControl.jsx, introduced a reusable downloadAsCsv helper and a “Download CSV” button next to the “All Admins” header that exports the current sortedAdmins (respecting search/sort) with columns for Name, Email, Role, Building, Phone, Guards, and Employees. In src/pages/SocietyControl.jsx, added a similar downloadAsCsv helper and “Download CSV” button next to the “All Buildings” header that exports the current sortedBuildings with columns Name, Location, ProgressPercent, and Date.
+- Decisions: Downloads are generated purely on the frontend from the already-normalized/filtered data, keeping changes minimal and avoiding backend impact while giving admins a quick way to export current views to CSV for reporting.
+- Next: Test both buttons to confirm CSV files download correctly and contain the expected filtered/sorted data for admins and buildings.
+
+
 
 
 

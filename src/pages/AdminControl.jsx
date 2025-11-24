@@ -160,6 +160,39 @@ const createInitialFormData = (roleValue = DEFAULT_ROLE_OPTIONS[0].value) => ({
   employees: "",
 });
 
+// Helper to download an array of row objects as CSV
+const downloadAsCsv = (filenameBase, rows) => {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return;
+  }
+
+  const headers = Object.keys(rows[0]);
+  const escapeCell = (value) => {
+    const str = value == null ? '' : String(value);
+    const escaped = str.replace(/"/g, '""');
+    return `"${escaped}"`;
+  };
+
+  const csvLines = [];
+  csvLines.push(headers.map(escapeCell).join(','));
+  rows.forEach((row) => {
+    const line = headers.map((key) => escapeCell(row[key]));
+    csvLines.push(line.join(','));
+  });
+
+  const csvContent = csvLines.join('\r\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+  link.href = url;
+  link.setAttribute('download', `${filenameBase}-${timestamp}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
 export default function AdminControl() {
   const [showModal, setShowModal] = useState(false);
   const [modalContext, setModalContext] = useState('default');
@@ -762,6 +795,35 @@ export default function AdminControl() {
               </div>
             )}
           </div>
+          <button
+            type="button"
+            onClick={() => {
+              if (!sortedAdmins || sortedAdmins.length === 0) {
+                return;
+              }
+              const rows = sortedAdmins.map((admin) => ({
+                Name: admin.name || '',
+                Email: admin.email || '',
+                Role: admin.role || '',
+                Building: admin.building || '',
+                Phone: admin.phoneNumber || '',
+                Guards: admin.securityGuards || '',
+                Employees: admin.employees || '',
+              }));
+              downloadAsCsv('admins', rows);
+            }}
+            className="flex-1 min-w-[150px] inline-flex items-center justify-center gap-1 px-4 py-2 border border-[#b00020] rounded-lg text-sm text-[#b00020] font-medium hover:bg-[#b00020]/10 transition"
+          >
+            <svg
+              className="w-3.5 h-3.5 text-[#b00020]"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path d="M3 3a2 2 0 012-2h6a1 1 0 01.707.293l4 4A1 1 0 0116 7h-3a1 1 0 01-1-1V3H5v14h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H5a2 2 0 01-2-2V3z" />
+              <path d="M11 11a1 1 0 10-2 0v1.586L8.293 12.88a1 1 0 00-1.414 1.415l3 3a1 1 0 001.414 0l3-3a1 1 0 10-1.414-1.415L11 12.586V11z" />
+            </svg>
+            <span>Download CSV</span>
+          </button>
           <button
             onClick={() => handleOpenModalForRole('resident')}
             className="flex-1 min-w-[150px] flex items-center gap-2 px-4 py-2 border border-[#b00020] rounded-lg text-sm text-[#b00020] font-medium hover:bg-[#b00020]/10 transition justify-center"
