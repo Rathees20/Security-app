@@ -155,18 +155,31 @@ export default function SocietyControl() {
         if (userData) {
           const user = JSON.parse(userData);
           const role = user?.role || user?.roleValue || '';
-          const buildingId = pickValue(user, [
+          
+          // Derive buildingId from various possible shapes
+          let rawBuildingId = pickValue(user, [
             'buildingId',
             'building.id',
             'building._id',
-            'buildingId',
-            'assignedBuilding',
-            'assignedBuildingId'
+            'assignedBuildingId',
+            'assignedBuilding.id',
+            'assignedBuilding._id',
           ]);
-          
-          setUserRole(role?.toLowerCase());
-          setUserBuildingId(buildingId);
-          console.log('[SocietyControl] Current user role:', role, 'buildingId:', buildingId);
+
+          if (!rawBuildingId) {
+            const buildingObj = pickValue(user, ['assignedBuilding', 'building']);
+            if (buildingObj && typeof buildingObj === 'object') {
+              rawBuildingId = pickValue(buildingObj, ['_id', 'id']);
+            }
+          }
+
+          const finalBuildingId = rawBuildingId && typeof rawBuildingId !== 'object' ? rawBuildingId : null;
+
+          // Store role in both original and lowercase for flexible checking
+          const normalizedRole = role?.toLowerCase();
+          setUserRole(normalizedRole);
+          setUserBuildingId(finalBuildingId);
+          console.log('[SocietyControl] User role:', role, 'normalized:', normalizedRole, 'buildingId:', finalBuildingId);
         }
       } catch (err) {
         console.error('[SocietyControl] Failed to get user info', err);
@@ -310,20 +323,29 @@ export default function SocietyControl() {
         date: formatDate(pickValue(item, ['createdAt', 'updatedAt', 'date'])),
       }));
 
-      // Filter buildings based on user's building if not super admin
-      if (userBuildingId && userRole !== 'super_admin' && userRole !== 'admin') {
-        console.log('[SocietyControl] Filtering buildings for user buildingId:', userBuildingId);
+      // Filter buildings to show only user's building if they're building admin
+      // Check for various building admin role formats (BUILDING_ADMIN, building_admin, super_admin, etc.)
+      const isBuildingAdmin = userRole && (
+        userRole === 'building_admin' || 
+        userRole === 'super_admin' || 
+        userRole === 'build_admin' ||
+        userRole === 'buildingadmin' ||
+        (userRole.includes('building') && userRole.includes('admin'))
+      );
+      
+      const isSuperAdminOrAdmin = userRole === 'super_admin' || userRole === 'admin';
+      
+      if (userBuildingId && isBuildingAdmin) {
+        console.log('[SocietyControl] Filtering buildings for building admin, buildingId:', userBuildingId);
         normalized = normalized.filter((building) => {
-          // Compare both as strings to handle different ID formats
-          const buildingIdStr = String(building.id);
-          const userBuildingIdStr = String(userBuildingId);
-          return buildingIdStr === userBuildingIdStr;
+          // Compare building IDs as strings to handle different formats
+          return String(building.id) === String(userBuildingId);
         });
         console.log('[SocietyControl] Filtered buildings count:', normalized.length);
-      } else if (userRole === 'super_admin' || userRole === 'admin') {
+      } else if (isSuperAdminOrAdmin) {
         console.log('[SocietyControl] Super admin/admin - showing all buildings');
       } else {
-        console.log('[SocietyControl] No buildingId found for user - showing all buildings');
+        console.log('[SocietyControl] No buildingId found or not building admin - showing all buildings');
       }
 
       setBuildings(normalized);

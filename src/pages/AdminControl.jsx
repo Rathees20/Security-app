@@ -218,6 +218,10 @@ export default function AdminControl() {
     [sortOption]
   );
 
+  // Get current user role and assigned building from localStorage
+  const [userRole, setUserRole] = useState(null);
+  const [userBuildingId, setUserBuildingId] = useState(null);
+
   const PHONE_REGEX = /^\d{10}$/;
 
   const handleInputChange = (e) => {
@@ -281,7 +285,7 @@ export default function AdminControl() {
     setAdminsError('');
     try {
       const response = await api.getAllUsers('?limit=100');
-      const normalized = extractArray(response).map((item, index) => {
+      let normalized = extractArray(response).map((item, index) => {
         const employeeCount =
           findNumericByKeyword(item, ['employee', 'staff']) ??
           pickValue(item, [
@@ -305,6 +309,30 @@ export default function AdminControl() {
           ]);
 
         const rawRole = pickValue(item, ['role']);
+        
+        // Extract buildingId from various possible locations
+        let adminBuildingId = pickValue(item, [
+          'buildingId',
+          'building.id',
+          'building._id',
+          'assignedBuildingId',
+          'assignedBuilding.id',
+          'assignedBuilding._id',
+        ]);
+
+        // If buildingId not found, check for nested building object
+        if (!adminBuildingId) {
+          const buildingObj = pickValue(item, ['assignedBuilding', 'building']);
+          if (buildingObj && typeof buildingObj === 'object') {
+            adminBuildingId = pickValue(buildingObj, ['_id', 'id', 'buildingId']);
+          }
+        }
+
+        // Ensure buildingId is a primitive value, not an object
+        if (adminBuildingId && typeof adminBuildingId === 'object') {
+          adminBuildingId = pickValue(adminBuildingId, ['_id', 'id']);
+        }
+
         return {
           id: pickValue(item, ['_id', 'id', 'userId']) ?? `admin-${index}`,
           name: toDisplayString(
@@ -315,6 +343,7 @@ export default function AdminControl() {
             pickValue(item, ['buildingName', 'building.name']),
             'Not assigned'
           ),
+          buildingId: adminBuildingId, // Store buildingId for filtering
           email: toDisplayString(pickValue(item, ['email']), 'Email unavailable'),
           phoneNumber: toDisplayString(
             pickValue(item, ['phoneNumber', 'contactNumber']),
@@ -332,6 +361,25 @@ export default function AdminControl() {
             )}`,
         };
       });
+
+      // Filter admins by building if user is building admin
+      // Check for various building admin role formats (BUILDING_ADMIN, building_admin, super_admin, etc.)
+      const isBuildingAdmin = userRole && (
+        userRole === 'building_admin' || 
+        userRole === 'super_admin' || 
+        userRole === 'build_admin' ||
+        userRole === 'buildingadmin' ||
+        userRole.includes('building') && userRole.includes('admin')
+      );
+      
+      if (userBuildingId && isBuildingAdmin) {
+        normalized = normalized.filter((admin) => {
+          // Compare building IDs as strings to handle different formats
+          return String(admin.buildingId) === String(userBuildingId);
+        });
+        console.log('[AdminControl] Filtered admins for building admin:', normalized.length, 'buildingId:', userBuildingId);
+      }
+
       setAdmins(normalized);
     } catch (err) {
       console.error('Failed to fetch admins', err);
@@ -340,6 +388,47 @@ export default function AdminControl() {
     } finally {
       setIsLoadingAdmins(false);
     }
+  }, [userRole, userBuildingId]);
+
+  // Get user information from localStorage
+  useEffect(() => {
+    const getUserInfo = () => {
+      try {
+        const userData = window.localStorage.getItem('authUser');
+        if (userData) {
+          const user = JSON.parse(userData);
+          const role = user?.role || user?.roleValue || '';
+          
+          // Derive buildingId from various possible shapes
+          let rawBuildingId = pickValue(user, [
+            'buildingId',
+            'building.id',
+            'building._id',
+            'assignedBuildingId',
+            'assignedBuilding.id',
+            'assignedBuilding._id',
+          ]);
+
+          if (!rawBuildingId) {
+            const buildingObj = pickValue(user, ['assignedBuilding', 'building']);
+            if (buildingObj && typeof buildingObj === 'object') {
+              rawBuildingId = pickValue(buildingObj, ['_id', 'id']);
+            }
+          }
+
+          const finalBuildingId = rawBuildingId && typeof rawBuildingId !== 'object' ? rawBuildingId : null;
+
+          // Store role in both original and lowercase for flexible checking
+          const normalizedRole = role?.toLowerCase();
+          setUserRole(normalizedRole);
+          setUserBuildingId(finalBuildingId);
+          console.log('[AdminControl] User role:', role, 'normalized:', normalizedRole, 'buildingId:', finalBuildingId);
+        }
+      } catch (err) {
+        console.error('[AdminControl] Failed to get user info', err);
+      }
+    };
+    getUserInfo();
   }, []);
 
   useEffect(() => {
@@ -508,7 +597,7 @@ export default function AdminControl() {
     setBuildingOptionsError('');
     try {
       const response = await api.getBuildings();
-      const normalized = extractArray(response).map((item, index) => ({
+      let normalized = extractArray(response).map((item, index) => ({
         id: pickValue(item, ['_id', 'id', 'buildingId']) ?? `building-${index}`,
         name: toDisplayString(
           pickValue(item, ['name', 'buildingName', 'title']),
@@ -519,6 +608,25 @@ export default function AdminControl() {
           ''
         ),
       }));
+
+      // Filter buildings to show only user's building if they're building admin
+      // Check for various building admin role formats (BUILDING_ADMIN, building_admin, super_admin, etc.)
+      const isBuildingAdmin = userRole && (
+        userRole === 'building_admin' || 
+        userRole === 'super_admin' || 
+        userRole === 'build_admin' ||
+        userRole === 'buildingadmin' ||
+        userRole.includes('building') && userRole.includes('admin')
+      );
+      
+      if (userBuildingId && isBuildingAdmin) {
+        normalized = normalized.filter((building) => {
+          // Compare building IDs as strings to handle different formats
+          return String(building.id) === String(userBuildingId);
+        });
+        console.log('[AdminControl] Filtered buildings for building admin:', normalized.length, 'buildingId:', userBuildingId);
+      }
+
       setBuildingOptions(normalized);
     } catch (err) {
       console.error('Failed to fetch buildings', err);
@@ -527,7 +635,7 @@ export default function AdminControl() {
     } finally {
       setIsLoadingBuildingOptions(false);
     }
-  }, []);
+  }, [userRole, userBuildingId]);
 
   useEffect(() => {
     if (!showModal) {
@@ -595,6 +703,10 @@ export default function AdminControl() {
       if (!formData.buildingId) {
         nextFieldErrors.buildingId = 'Please select a building.';
       }
+      // Backend requires employeeCode for BUILDING_ADMIN role
+      if (!formData.employeeCode.trim()) {
+        nextFieldErrors.employeeCode = 'Employee code is required.';
+      }
     }
 
     if (Object.keys(nextFieldErrors).length > 0) {
@@ -602,12 +714,47 @@ export default function AdminControl() {
       return;
     }
 
+    // Map roles to backend-expected format
+    // First, try to find the role in availableRoles (these come from backend, so they're valid)
+    // If not found, use default mappings
+    let backendRole = role?.trim() || '';
+    const normalizedRole = backendRole.toLowerCase().replace(/\s+/g, '_');
+    
+    // Check if this role exists in availableRoles (from backend)
+    const matchingRole = availableRoles.find(
+      (option) => option.value?.toLowerCase().replace(/\s+/g, '_') === normalizedRole
+    );
+    
+    if (matchingRole) {
+      // Use the exact backend value from availableRoles
+      backendRole = matchingRole.value;
+    } else {
+      // Map roles to backend format (for new roles not yet in backend)
+      if (normalizedRole === 'building_admin' || normalizedRole === 'buildingadmin') {
+        // User requirement: "use building admin is admin" - try 'admin'
+        backendRole = 'admin';
+      } else if (normalizedRole === 'admin') {
+        backendRole = 'admin';
+      } else if (normalizedRole === 'security') {
+        backendRole = 'security';
+      } else if (normalizedRole === 'resident') {
+        backendRole = 'resident';
+      } else if (normalizedRole === 'super_admin' || normalizedRole === 'superadmin') {
+        backendRole = 'super_admin';
+      } else {
+        // Keep as lowercase with underscores
+        backendRole = normalizedRole;
+      }
+    }
+    
+    console.log('[AdminControl] Role mapping:', { original: role, normalized: normalizedRole, backendRole, availableRoles: availableRoles.map(r => r.value) });
+
     const payload = {
       name,
       email: trimmedEmail,
       password: formData.password,
       confirmPassword: formData.confirmPassword,
-      role,
+      role: backendRole,
       phoneNumber,
     };
 
@@ -639,7 +786,8 @@ export default function AdminControl() {
       }
     }
 
-    if (requiresSecurityFields && formData.employeeCode && formData.employeeCode.trim()) {
+    // Include employeeCode for both security and building admin roles
+    if ((requiresSecurityFields || requiresBuildingAdminFields) && formData.employeeCode && formData.employeeCode.trim()) {
       payload.employeeCode = formData.employeeCode.trim();
     }
 
@@ -1168,7 +1316,7 @@ export default function AdminControl() {
                 </div>
               )}
 
-              {requiresSecurityFields && (
+              {(requiresSecurityFields || requiresBuildingAdminFields) && (
                 <div className="space-y-4">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Employee Code</label>

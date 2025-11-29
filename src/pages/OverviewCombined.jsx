@@ -215,13 +215,6 @@ function Header() {
 function RightPanel() {
   const [currentDate, setCurrentDate] = React.useState(new Date())
   const [selectedDate, setSelectedDate] = React.useState(new Date())
-  
-  const Item = ({ idx, title, phone }) => (
-    <div className="flex items-center gap-3 py-2">
-      <div className="w-6 h-6 bg-[#B00020] text-white text-xs rounded flex items-center justify-center font-medium">{idx}</div>
-      <div className="text-sm text-neutral-800">{title} - {phone}</div>
-    </div>
-  )
 
   const navigateMonth = (direction) => {
     setCurrentDate(prevDate => {
@@ -318,26 +311,6 @@ function RightPanel() {
               {day.date}
             </div>
           ))}
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm border border-neutral-100 p-5">
-        <div className="text-lg font-bold text-[#B00020] mb-4">Contact Numbers for Emergency</div>
-        <div className="mb-4">
-          <div className="text-sm font-medium text-neutral-800 mb-2">Admins</div>
-          <div className="space-y-1">
-            <Item idx={1} title="Building1 : Sam" phone="9724382764" />
-            <Item idx={2} title="Building 2 : Sam" phone="9724382764" />
-            <Item idx={3} title="Building 3 : Sam" phone="9724382764" />
-          </div>
-        </div>
-        <div>
-          <div className="text-sm font-medium text-neutral-800 mb-2">Security</div>
-          <div className="space-y-1">
-            <Item idx={1} title="Building1 : Sam" phone="9724382764" />
-            <Item idx={2} title="Building 2 : Sam" phone="9724382764" />
-            <Item idx={3} title="Building 3 : Sam" phone="9724382764" />
-          </div>
         </div>
       </div>
     </aside>
