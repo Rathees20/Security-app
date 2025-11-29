@@ -199,6 +199,16 @@ export const api = {
       method: 'POST',
       body: payload,
     }),
+  updateUser: (userId, payload) =>
+    apiRequest(`/auth/users/${userId}`, {
+      method: 'PUT',
+      body: payload,
+    }),
+  updateProfile: (payload) =>
+    apiRequest('/auth/profile', {
+      method: 'PUT',
+      body: payload,
+    }),
   getUpcomingVisitors: (buildingId, residentId) =>
     apiRequest(`/pre-approvals/${buildingId}/${residentId}`),
 };
