@@ -311,6 +311,11 @@ export default function SocietyControl() {
           pickValue(item, ['address', 'buildingAddress', 'location']),
           'No address provided'
         ),
+        // Try common fields where backend may return image URL/path
+        imageUrl: toDisplayString(
+          pickValue(item, ['imageUrl', 'image', 'photo', 'thumbnailUrl', 'thumbnail']),
+          ''
+        ),
         progress:
           Number(
             pickValue(item, [
@@ -557,10 +562,20 @@ export default function SocietyControl() {
           {!isLoadingBuildings &&
             sortedBuildings.map((building) => (
               <div key={building.id} className="bg-white rounded-xl shadow-sm border border-neutral-200 p-5 hover:shadow-md transition-shadow">
-              {/* Building Image Placeholder */}
-              <div className="h-28 bg-neutral-200 rounded-lg flex items-center justify-center text-neutral-500 mb-4">
-                Building image
-              </div>
+              {/* Building Image */}
+              {building.imageUrl ? (
+                <div className="h-28 rounded-lg overflow-hidden mb-4">
+                  <img
+                    src={building.imageUrl}
+                    alt={building.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="h-28 bg-neutral-200 rounded-lg flex items-center justify-center text-neutral-500 mb-4">
+                  Building image
+                </div>
+              )}
               
               {/* Name */}
               <h3 className="font-bold text-neutral-900 text-base mb-1">{building.name}</h3>

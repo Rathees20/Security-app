@@ -155,6 +155,8 @@ const createInitialFormData = (roleValue = DEFAULT_ROLE_OPTIONS[0].value) => ({
   employeeCode: "",
   buildingName: "",
   buildingAddress: "",
+  blockNumber: "",
+  flatNumber: "",
   phoneNumber: "",
   securityGuards: "",
   employees: "",
@@ -707,6 +709,13 @@ export default function AdminControl() {
       if (!formData.employeeCode.trim()) {
         nextFieldErrors.employeeCode = 'Employee code is required.';
       }
+      // Require block and flat numbers for building admin
+      if (!formData.blockNumber?.trim()) {
+        nextFieldErrors.blockNumber = 'Block number is required.';
+      }
+      if (!formData.flatNumber?.trim()) {
+        nextFieldErrors.flatNumber = 'Flat number is required.';
+      }
     }
 
     if (Object.keys(nextFieldErrors).length > 0) {
@@ -729,21 +738,21 @@ export default function AdminControl() {
       // Use the exact backend value from availableRoles
       backendRole = matchingRole.value;
     } else {
-      // Map roles to backend format (for new roles not yet in backend)
+      // Map roles to backend format (for new roles not yet in backend or when no users of that role exist yet)
       if (normalizedRole === 'building_admin' || normalizedRole === 'buildingadmin') {
-        // User requirement: "use building admin is admin" - try 'admin'
-        backendRole = 'admin';
+        // Backend expects BUILDING_ADMIN constant
+        backendRole = 'BUILDING_ADMIN';
       } else if (normalizedRole === 'admin') {
-        backendRole = 'admin';
+        backendRole = 'ADMIN';
       } else if (normalizedRole === 'security') {
-        backendRole = 'security';
+        backendRole = 'SECURITY';
       } else if (normalizedRole === 'resident') {
-        backendRole = 'resident';
+        backendRole = 'RESIDENT';
       } else if (normalizedRole === 'super_admin' || normalizedRole === 'superadmin') {
-        backendRole = 'super_admin';
+        backendRole = 'SUPER_ADMIN';
       } else {
-        // Keep as lowercase with underscores
-        backendRole = normalizedRole;
+        // Fallback: keep as upper snake case
+        backendRole = normalizedRole.toUpperCase();
       }
     }
     
@@ -769,6 +778,14 @@ export default function AdminControl() {
     
     if (formData.buildingAddress && formData.buildingAddress.trim()) {
       payload.buildingAddress = formData.buildingAddress.trim();
+    }
+
+    if (formData.blockNumber && formData.blockNumber.trim()) {
+      payload.blockNumber = formData.blockNumber.trim();
+    }
+
+    if (formData.flatNumber && formData.flatNumber.trim()) {
+      payload.flatNumber = formData.flatNumber.trim();
     }
     
     // Convert to numbers if they have values
@@ -1331,6 +1348,37 @@ export default function AdminControl() {
                       <p className="mt-1 text-xs text-red-600">{fieldErrors.employeeCode}</p>
                     )}
                   </div>
+
+                  {requiresBuildingAdminFields && (
+                    <>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Block Number</label>
+                        <input
+                          name="blockNumber"
+                          value={formData.blockNumber}
+                          onChange={handleInputChange}
+                          placeholder="Enter block number"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#b00020]"
+                        />
+                        {fieldErrors.blockNumber && (
+                          <p className="mt-1 text-xs text-red-600">{fieldErrors.blockNumber}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Flat Number</label>
+                        <input
+                          name="flatNumber"
+                          value={formData.flatNumber}
+                          onChange={handleInputChange}
+                          placeholder="Enter flat number"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#b00020]"
+                        />
+                        {fieldErrors.flatNumber && (
+                          <p className="mt-1 text-xs text-red-600">{fieldErrors.flatNumber}</p>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
