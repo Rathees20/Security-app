@@ -1,4 +1,4 @@
-const DEFAULT_BACKEND_URL = 'http://13.204.214.117/api';
+const DEFAULT_BACKEND_URL = 'https://securityapp-backend.vercel.app/api';
 
 const normalizeUrl = (url) => (url.endsWith('/') ? url.slice(0, -1) : url);
 
